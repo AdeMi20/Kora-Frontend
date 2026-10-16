@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { getPositions } from "@/lib/stellar/contracts";
 import { fetchPositions } from "@/services/invoiceService";
 import { env } from "@/lib/env";
+import { queryKeys } from "@/lib/queryKeys";
 import { usePositionListingStore } from "@/store/positionListingStore";
 import type { InvestorPosition } from "@/types/invoice";
 
@@ -29,7 +30,7 @@ export function usePositions(
   );
 
   return useQuery<InvestorPosition[]>({
-    queryKey: ["positions", investorAddress],
+    queryKey: queryKeys.invoices.positions(investorAddress ?? ""),
     queryFn: async () => {
       if (!investorAddress) return [];
 

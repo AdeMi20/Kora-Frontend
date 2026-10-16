@@ -51,6 +51,12 @@ describe("queryKeys hierarchy", () => {
     expect(queryKeyHierarchy.invoices.positionsPrefix).toEqual(["invoices", "positions"]);
   });
 
+  it("nests investor positions under the positions prefix so invalidations reach usePositions", () => {
+    const key = queryKeys.invoices.positions("GABC", "live");
+    expect(key).toEqual(["invoices", "positions", "live", "GABC"]);
+    expect(key.slice(0, 2)).toEqual(queryKeyHierarchy.invoices.positionsPrefix);
+  });
+
   it("sorts batch invoice ids so equivalent batches share one key", () => {
     expect(queryKeys.invoices.batch(["9", "1", "5"])).toEqual([
       "invoices",
