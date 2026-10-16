@@ -3,7 +3,7 @@
 import { Suspense, useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { PlusCircle, TrendingUp, FileText, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { PlusCircle, TrendingUp, FileText, Clock, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -505,6 +505,29 @@ export default function SMEDashboardPage() {
           </Button>
         </Link>
       </div>
+
+      {!batchActionsEnabled && (
+        <div
+          role="note"
+          className="mb-6 flex gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div>
+            <p className="font-medium text-foreground">{t("batch.disabledTitle")}</p>
+            <p className="mt-1 text-muted-foreground">
+              {t("batch.disabledDesc", { envVar: "NEXT_PUBLIC_ENABLE_BATCH_ACTIONS" })}{" "}
+              <a
+                href="https://github.com/OpenLedger-Foundation/Kora-Frontend/blob/main/docs/feature-flags.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                {t("batch.disabledDocs")}
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
 
       {address && (
         <Suspense fallback={<StatsGridSkeleton />}>

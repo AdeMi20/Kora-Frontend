@@ -456,6 +456,9 @@
       "message": "Crie sua primeira fatura para começar a captar liquidez."
     },
     "batch": {
+      "disabledTitle": "As ações em lote estão desativadas",
+      "disabledDesc": "O cancelamento e o pagamento em lote estão desativados nesta implantação. Operadores auto-hospedados podem ativá-los definindo {envVar}=true.",
+      "disabledDocs": "Documentação de feature flags",
       "title": "Resumo da Operação em Lote",
       "exportSelected": "Exportar selecionados",
       "processingLabel": "Cancelando {count} fatura(s)..."

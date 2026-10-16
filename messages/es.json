@@ -456,6 +456,9 @@
       "message": "Crea tu primera factura para comenzar a obtener liquidez."
     },
     "batch": {
+      "disabledTitle": "Las acciones por lotes están desactivadas",
+      "disabledDesc": "La cancelación y el reembolso por lotes están desactivados en este despliegue. Los operadores autoalojados pueden activarlos con {envVar}=true.",
+      "disabledDocs": "Documentación de feature flags",
       "title": "Resumen de Operación por Lotes",
       "exportSelected": "Exportar seleccionadas",
       "processingLabel": "Cancelando {count} facturas..."
