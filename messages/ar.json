@@ -49,7 +49,12 @@
     "reconnect": "إعادة ربط المحفظة",
     "reconnecting": "جارٍ إعادة الربط...",
     "restoringSession": "جارٍ استعادة جلسة المحفظة...",
-    "balanceLoadFailed": "تعذر تحميل الأرصدة"
+    "balanceLoadFailed": "تعذر تحميل الأرصدة",
+    "walletConnected": "تم الاتصال بالمحفظة",
+    "redirecting": "جارٍ توجيهك إلى لوحة التحكم…",
+    "mobileApp": "تطبيق الجوال",
+    "openInApp": "افتح في التطبيق",
+    "deepLinkWaiting": "في انتظار فتح تطبيق المحفظة…"
   },
   "transaction": {
     "building": "جارٍ بناء المعاملة…",
@@ -301,7 +306,15 @@
     },
     "hint": {
       "minRemaining": "الحد الأدنى: ${min} · الطاقة المتبقية: ${remaining}"
-    }
+    },
+    "ipfsLoadingPreview": "جارٍ تحميل معاينة المستند…",
+    "ipfsRetry": "إعادة المحاولة",
+    "ipfsOpenInNewTab": "افتح في تبويب جديد",
+    "ipfsErrorTitle": "معاينة المستند غير متاحة",
+    "ipfsErrorDesc": "لم تستجب بوابة IPFS في الوقت المناسب. يمكنك إعادة المحاولة أو فتح المستند مباشرة.",
+    "ipfsOfflineTitle": "أنت غير متصل بالإنترنت",
+    "ipfsOfflineDesc": "تتطلب معاينة المستند اتصالاً بالإنترنت.",
+    "ipfsDownloadPdf": "تنزيل PDF"
   },
   "createInvoice": {
     "title": "إنشاء فاتورة",
@@ -841,7 +854,14 @@
     "statusSuccess": "تم الإرسال",
     "statusError": "فشل",
     "statusPending": "في قائمة الانتظار",
-    "badgeAriaLabel": "{count} معاملة (معاملات) معلقة"
+    "badgeAriaLabel": "{count} معاملة (معاملات) معلقة",
+    "statusExhausted": "تم الوصول إلى الحد الأقصى من المحاولات",
+    "retryIn": "إعادة المحاولة خلال {seconds} ثانية",
+    "retryExhausted": "تم الوصول إلى الحد الأقصى من المحاولات",
+    "retryExhaustedDesc": "تعذّر إرسال هذه المعاملة بعد 5 محاولات. انسخ الـ XDR الموقّع لإعادة الإرسال يدويًا، أو تجاهله.",
+    "copyXdrAriaLabel": "نسخ الـ XDR الموقّع إلى الحافظة",
+    "xdrCopied": "تم نسخ الـ XDR الموقّع إلى الحافظة",
+    "xdrCopyFailed": "فشل نسخ الـ XDR"
   },
   "notFound": {
     "title": "الصفحة غير موجودة",
@@ -1485,6 +1505,24 @@
       "title": "فشل التحقق",
       "body": "تعذّر على Synaps التحقق من مستندك تلقائيًا. تأكد من أن صورة المستند واضحة وغير مقصوصة وأن جميع التفاصيل ظاهرة.",
       "retry": "حاول مرة أخرى"
+    }
+  },
+  "pwa": {
+    "manifest": {
+      "shortcuts": {
+        "marketplace": {
+          "shortName": "السوق",
+          "description": "تصفح قائمة الفواتير"
+        },
+        "createInvoice": {
+          "shortName": "إنشاء",
+          "description": "رمز فاتورة جديدة"
+        }
+      },
+      "screenshots": {
+        "wide": "سوق Kora Protocol",
+        "narrow": "Kora Protocol على الجوال"
+      }
     }
   }
 }
