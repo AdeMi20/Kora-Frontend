@@ -12,6 +12,11 @@
  * banner and the acquire simulation-failure UI must both recover cleanly
  * without leaving a stuck modal behind.
  *
+ * Issue #942 adds URL filter sync coverage: filters write their query keys,
+ * survive reload and back/forward, and malformed params are sanitized. Those
+ * tests assert on the URL and the filter controls only, never on listing
+ * counts, so they do not depend on the mock listings.
+ *
  * Run:
  *   npx playwright test e2e/secondary-market.spec.ts
  */
@@ -26,9 +31,12 @@ async function suppressOverlays(page: Page) {
   });
 }
 
-/** Each position card carries exactly one "Acquire Position" button. */
+/**
+ * Each position card carries exactly one acquire button — "Acquire Position"
+ * with a wallet connected, "Connect Wallet to Acquire" without one.
+ */
 function positionCards(page: Page) {
-  return page.getByRole("button", { name: /acquire position/i });
+  return page.getByRole("button", { name: /acquire position|connect wallet to acquire/i });
 }
 
 /**
@@ -36,20 +44,30 @@ function positionCards(page: Page) {
  *
  * The Select renders a hidden native <select> for form libraries plus a Radix
  * popover for the actual UI, so the accessible label belongs to the hidden
- * element — the visible control has to be driven by its current label.
+ * element — the visible control has to be driven by its current label. Its
+ * options are plain buttons inside the popover. The trigger is retried because
+ * a click that lands before hydration is dropped.
  */
 async function chooseFilter(page: Page, currentLabel: string, optionLabel: string) {
-  await page.getByRole("button", { name: currentLabel, exact: true }).click();
-  await page.getByRole("option", { name: optionLabel }).click();
+  const option = page
+    .locator("[data-radix-popper-content-wrapper]")
+    .getByRole("button", { name: optionLabel, exact: true });
+  await expect(async () => {
+    if (!(await option.isVisible())) {
+      await page.getByRole("button", { name: currentLabel, exact: true }).click();
+    }
+    await expect(option).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await option.click();
 }
 
 const SELLER_PLACEHOLDER = "Seller G-address...";
 
-async function gotoSecondary(page: Page) {
+async function gotoSecondary(page: Page, search = "") {
   await suppressOverlays(page);
   // domcontentloaded rather than load: dev-server chunk requests can keep the
   // load event pending well past the point the page is interactive.
-  await page.goto("/secondary", { waitUntil: "domcontentloaded" });
+  await page.goto(`/secondary${search}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: /secondary market/i })).toBeVisible({
     timeout: 15_000,
   });
@@ -148,6 +166,96 @@ test.describe("Secondary market browse", () => {
     await expect(page.getByRole("button", { name: "0 - 30 days", exact: true })).toBeVisible({
       timeout: 10_000,
     });
+  });
+});
+
+/** Current query params as a plain object, for exact URL assertions. */
+function searchParamsOf(page: Page): Record<string, string> {
+  return Object.fromEntries(new URL(page.url()).searchParams);
+}
+
+/** The visible desktop Select trigger currently showing `label`. */
+function filterTrigger(page: Page, label: string) {
+  return page.getByRole("button", { name: label, exact: true });
+}
+
+test.describe("Secondary market URL filter sync", () => {
+  test("tenor and yield filters write their query keys", async ({ page }) => {
+    await gotoSecondary(page);
+
+    await chooseFilter(page, "All Tenors", "0 - 30 days");
+    await chooseFilter(page, "Any Yield", "10%+ Yield");
+
+    await expect
+      .poll(() => searchParamsOf(page), { timeout: 15_000 })
+      .toEqual({ tenor: "0-30", yield: "10" });
+  });
+
+  test("a reload keeps multiple filters applied", async ({ page }) => {
+    await gotoSecondary(page, "?tenor=31-60&yield=5");
+    await expect(filterTrigger(page, "31 - 60 days")).toBeVisible({ timeout: 10_000 });
+    await expect(filterTrigger(page, "5%+ Yield")).toBeVisible();
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    await expect(filterTrigger(page, "31 - 60 days")).toBeVisible({ timeout: 15_000 });
+    await expect(filterTrigger(page, "5%+ Yield")).toBeVisible();
+    expect(searchParamsOf(page)).toEqual({ tenor: "31-60", yield: "5" });
+  });
+
+  test("back and forward restore the previous filter set", async ({ page }) => {
+    await gotoSecondary(page, "?tenor=0-30");
+    await expect(filterTrigger(page, "0 - 30 days")).toBeVisible({ timeout: 10_000 });
+
+    await gotoSecondary(page, "?yield=15");
+    await expect(filterTrigger(page, "15%+ Yield")).toBeVisible({ timeout: 10_000 });
+
+    await page.goBack({ waitUntil: "domcontentloaded" });
+    await expect(filterTrigger(page, "0 - 30 days")).toBeVisible({ timeout: 15_000 });
+    await expect(filterTrigger(page, "Any Yield")).toBeVisible();
+    expect(searchParamsOf(page)).toEqual({ tenor: "0-30" });
+
+    await page.goForward({ waitUntil: "domcontentloaded" });
+    await expect(filterTrigger(page, "15%+ Yield")).toBeVisible({ timeout: 15_000 });
+    await expect(filterTrigger(page, "All Tenors")).toBeVisible();
+    expect(searchParamsOf(page)).toEqual({ yield: "15" });
+  });
+
+  test("malformed params are sanitized without crashing", async ({ page }) => {
+    // Unknown tenor/yield values fall back to defaults; the BEL control
+    // character is stripped from q.
+    await gotoSecondary(page, "?tenor=bogus&yield=999&q=%07abc");
+
+    await expect(filterTrigger(page, "All Tenors")).toBeVisible({ timeout: 10_000 });
+    await expect(filterTrigger(page, "Any Yield")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /search secondary market listings/i })).toHaveValue(
+      "abc",
+    );
+    await expect
+      .poll(() => searchParamsOf(page), { timeout: 15_000 })
+      .toEqual({ q: "abc" });
+  });
+
+  test("an empty result set keeps its params through a reload", async ({ page }) => {
+    const seller = "GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
+    await gotoSecondary(page);
+
+    // Re-fill until it sticks: input typed before hydration is discarded.
+    const sellerInput = page.getByRole("textbox", { name: /filter by seller address/i }).first();
+    await expect(async () => {
+      await sellerInput.fill(seller);
+      await expect(page.getByText(/no transferable positions found/i)).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 15_000 });
+    await expect.poll(() => searchParamsOf(page), { timeout: 15_000 }).toEqual({ seller });
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    await expect(page.getByText(/no transferable positions found/i)).toBeVisible({
+      timeout: 15_000,
+    });
+    expect(searchParamsOf(page)).toEqual({ seller });
   });
 });
 

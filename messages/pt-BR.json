@@ -941,7 +941,11 @@
     "connectDesc": "As configurações são salvas por carteira. Conecte-se para ver e alterar suas preferências.",
     "connectCta": "Conectar carteira",
     "navLabel": "Configurações",
-    "openFull": "Abrir configurações completas"
+    "openFull": "Abrir configurações completas",
+    "error": {
+      "title": "Não foi possível carregar as configurações",
+      "description": "Suas preferências salvas não foram alteradas. Tente novamente para recarregar suas configurações de notificação e do tour, ou volte para o início."
+    }
   },
   "shortcuts": {
     "title": "Atalhos de Teclado",

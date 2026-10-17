@@ -941,7 +941,11 @@
     "connectDesc": "La configuración se guarda por billetera. Conéctate para ver y cambiar tus preferencias.",
     "connectCta": "Conectar billetera",
     "navLabel": "Configuración",
-    "openFull": "Abrir configuración completa"
+    "openFull": "Abrir configuración completa",
+    "error": {
+      "title": "No se pudo cargar la configuración",
+      "description": "Tus preferencias guardadas no se modificaron. Vuelve a intentarlo para recargar tus ajustes de notificaciones y del recorrido, o regresa al inicio."
+    }
   },
   "shortcuts": {
     "title": "Atajos de Teclado",
