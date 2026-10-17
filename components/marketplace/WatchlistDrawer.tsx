@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Bell, BellOff, Star, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useInvoiceStore } from "@/store";
-import type { NotificationPreferences } from "@/store/invoiceStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { formatCurrency, formatApr } from "@/lib/utils";
 
 interface WatchlistDrawerProps {
@@ -12,7 +12,9 @@ interface WatchlistDrawerProps {
   onClose: () => void;
 }
 
-const PREFERENCE_KEYS: Array<{ key: keyof NotificationPreferences; i18nKey: "fundingProgress" | "statusChanges" | "aprChanges" }> = [
+type WatchlistAlertKey = "fundingProgress" | "status" | "apr";
+
+const PREFERENCE_KEYS: Array<{ key: WatchlistAlertKey; i18nKey: "fundingProgress" | "statusChanges" | "aprChanges" }> = [
   { key: "fundingProgress", i18nKey: "fundingProgress" },
   { key: "status", i18nKey: "statusChanges" },
   { key: "apr", i18nKey: "aprChanges" },
@@ -22,8 +24,8 @@ export function WatchlistDrawer({ open, onClose }: WatchlistDrawerProps) {
   const t = useTranslations("marketplace.watchlist");
   const invoices = useInvoiceStore((state) => state.invoices);
   const watchedIds = useInvoiceStore((state) => state.watchedInvoiceIds);
-  const preferences = useInvoiceStore((state) => state.notificationPreferences);
-  const setPreferences = useInvoiceStore((state) => state.setNotificationPreferences);
+  const preferences = useSettingsStore((state) => state.notifications);
+  const setPreferences = useSettingsStore((state) => state.setNotifications);
   const toggleWatched = useInvoiceStore((state) => state.toggleWatchedInvoice);
   const watched = watchedIds
     .map((id) => invoices.find((invoice) => invoice.id === id))
@@ -61,7 +63,7 @@ export function WatchlistDrawer({ open, onClose }: WatchlistDrawerProps) {
               <input type="checkbox" checked={preferences[key]} onChange={(event) => setPreferences({ [key]: event.target.checked })} className="h-4 w-4 accent-primary" />
             </label>
           ))}
-          {!Object.values(preferences).some(Boolean) && <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><BellOff className="h-3 w-3" /> {t("alertsPaused")}</p>}
+          {PREFERENCE_KEYS.every(({ key }) => !preferences[key]) && <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><BellOff className="h-3 w-3" /> {t("alertsPaused")}</p>}
         </div>
       </aside>
     </div>

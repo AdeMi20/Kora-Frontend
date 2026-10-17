@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { TxState } from "@/types";
+import { useSettingsStore } from "./settingsStore";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -50,8 +51,16 @@ interface UIStore {
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 
+  /**
+   * @deprecated Notification preferences are owned by `settingsStore`. This
+   * mirror is kept only so the barrel export and legacy call sites keep
+   * resolving; the setter below forwards to the canonical store. Read
+   * `useSettingsStore((s) => s.notifications)` for gating decisions.
+   */
   notificationPreferences: NotificationPreferences;
+  /** @deprecated Writes through to the canonical `settingsStore`. */
   setNotificationPreferences: (prefs: Partial<NotificationPreferences>) => void;
+  /** @deprecated Resets the canonical `settingsStore`. */
   resetNotificationPreferences: () => void;
 
   // Keyboard shortcuts
@@ -101,15 +110,22 @@ export const useUIStore = create<UIStore>()(
       },
 
       notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
-      setNotificationPreferences: (prefs) =>
+      // Deprecated shim: keep the local mirror in sync for any stale reader,
+      // but the canonical write is what every notification gate now reads, so
+      // `/settings` toggles can no longer disagree with the wallet dropdown.
+      setNotificationPreferences: (prefs) => {
+        useSettingsStore.getState().setNotifications(prefs);
         set((s) => ({
           notificationPreferences: {
             ...s.notificationPreferences,
             ...prefs,
           },
-        })),
-      resetNotificationPreferences: () =>
-        set({ notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES }),
+        }));
+      },
+      resetNotificationPreferences: () => {
+        useSettingsStore.getState().resetNotifications();
+        set({ notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES });
+      },
 
       // Keyboard shortcuts
       shortcutsEnabled: DEFAULT_SHORTCUTS_ENABLED,
@@ -117,9 +133,11 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: "kora-ui-store",
+      // Notification preferences are intentionally omitted: they are persisted
+      // once, in `settingsStore`, and duplicating them here is what let the two
+      // copies drift apart. `settingsStore` migrates any legacy payload.
       partialize: (state) => ({
         theme: state.theme,
-        notificationPreferences: state.notificationPreferences,
         shortcutsEnabled: state.shortcutsEnabled,
       }),
     }

@@ -13,6 +13,7 @@ import {
   normalizeComparisonList,
   toggleComparisonId,
 } from "@/lib/comparison";
+import { useSettingsStore } from "./settingsStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,11 @@ const DEFAULT_SORT: SortState = { sortBy: "apr", sortDir: "desc" };
 export const MAX_WATCHLIST_ITEMS = 50;
 export const MAX_SAVED_PRESETS = 20;
 
+/**
+ * @deprecated Watchlist alert preferences are owned by `settingsStore`. This
+ * shape is retained for the legacy setter shim below; read
+ * `useSettingsStore((s) => s.notifications)` instead.
+ */
 export interface NotificationPreferences {
   fundingProgress: boolean;
   status: boolean;
@@ -311,6 +317,7 @@ interface InvoiceStore {
   selectedInvoice: Invoice | null;
   createDraft: InvoiceCreateDraft;
   watchedInvoiceIds: string[];
+  /** @deprecated Owned by `settingsStore`; kept only for the legacy setter shim. */
   notificationPreferences: NotificationPreferences;
   savedPresets: SavedMarketplacePreset[];
 
@@ -336,6 +343,7 @@ interface InvoiceStore {
   upsertInvoice: (invoice: Invoice) => void;
   toggleWatchedInvoice: (id: string) => boolean;
   isInvoiceWatched: (id: string) => boolean;
+  /** @deprecated Writes through to the canonical `settingsStore`. */
   setNotificationPreferences: (preferences: Partial<NotificationPreferences>) => void;
   updateInvoiceFunding: (id: string, newAmount: number) => void;
   rollbackInvoiceFunding: (id: string) => void;
@@ -451,10 +459,14 @@ export const useInvoiceStore = create<InvoiceStore>()(
 
       isInvoiceWatched: (id) => get().watchedInvoiceIds.includes(id),
 
-      setNotificationPreferences: (preferences) =>
+      // Deprecated shim: forward watchlist alert toggles to the canonical
+      // `settingsStore` so they agree with the rest of the notification UI.
+      setNotificationPreferences: (preferences) => {
+        useSettingsStore.getState().setNotifications(preferences);
         set((s) => ({
           notificationPreferences: { ...s.notificationPreferences, ...preferences },
-        })),
+        }));
+      },
 
       /** Optimistic update — instantly reflects new funding amount in UI */
       updateInvoiceFunding: (id, newAmount) =>

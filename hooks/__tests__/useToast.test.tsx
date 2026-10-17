@@ -14,7 +14,7 @@ import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 
 import { useToast } from "@/hooks/useToast";
-import { useUIStore, DEFAULT_NOTIFICATION_PREFERENCES } from "@/store/uiStore";
+import { useSettingsStore, DEFAULT_NOTIFICATION_PREFS } from "@/store/settingsStore";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -52,8 +52,8 @@ function renderNode(node: unknown): string {
 beforeEach(() => {
   vi.clearAllMocks();
   act(() => {
-    useUIStore.setState({
-      notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
+    useSettingsStore.setState({
+      notifications: { ...DEFAULT_NOTIFICATION_PREFS },
     });
   });
 });
@@ -122,9 +122,9 @@ describe("useToast — success", () => {
 
   it("returns the id it used when no toast is shown", () => {
     act(() => {
-      useUIStore.setState({
-        notificationPreferences: {
-          ...DEFAULT_NOTIFICATION_PREFERENCES,
+      useSettingsStore.setState({
+        notifications: {
+          ...DEFAULT_NOTIFICATION_PREFS,
           invoiceFunded: false,
         },
       });
@@ -252,9 +252,9 @@ describe("useToast — notification preferences", () => {
 
   it("suppresses a toast whose preference is off", () => {
     act(() => {
-      useUIStore.setState({
-        notificationPreferences: {
-          ...DEFAULT_NOTIFICATION_PREFERENCES,
+      useSettingsStore.setState({
+        notifications: {
+          ...DEFAULT_NOTIFICATION_PREFS,
           yieldAvailable: false,
         },
       });
@@ -274,9 +274,9 @@ describe("useToast — notification preferences", () => {
 
   it("does not gate a toast that names no preference", () => {
     act(() => {
-      useUIStore.setState({
-        notificationPreferences: {
-          ...DEFAULT_NOTIFICATION_PREFERENCES,
+      useSettingsStore.setState({
+        notifications: {
+          ...DEFAULT_NOTIFICATION_PREFS,
           txConfirmed: false,
           invoiceFunded: false,
           maturityReminder: false,

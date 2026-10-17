@@ -833,6 +833,12 @@
     "goHome": "Ir para o Início",
     "goMarketplace": "Ir para o Mercado"
   },
+  "globalError": {
+    "title": "Algo deu errado",
+    "description": "Um erro crítico impediu o carregamento do aplicativo. Recarregue a página para tentar novamente.",
+    "tryAgain": "Tentar Novamente",
+    "reload": "Recarregar página"
+  },
   "common": {
     "loading": "Carregando…",
     "connectWallet": "Conectar Carteira",
@@ -1218,7 +1224,22 @@
     "snoozeWeek": "Adiar 1 semana",
     "settings": "Ajustar limites",
     "critical": "Crítico",
-    "warning": "Aviso"
+    "warning": "Aviso",
+    "thresholdsTitle": "Limites de concentração",
+    "thresholdsDescription": "Sinalize sua carteira quando um único devedor, jurisdição ou nível de risco exceder estas proporções do seu valor.",
+    "dimensions": {
+      "debtor": "Devedor único",
+      "jurisdiction": "Jurisdição única",
+      "riskTier": "Nível de risco único"
+    },
+    "dimensionHints": {
+      "debtor": "Alerta quando um devedor exceder esta proporção da sua carteira.",
+      "jurisdiction": "Alerta quando uma jurisdição exceder esta proporção da sua carteira.",
+      "riskTier": "Alerta quando um nível de risco exceder esta proporção da sua carteira."
+    },
+    "sliderAria": "Controle deslizante do limite: {dimension}",
+    "percentageAria": "Percentual do limite: {dimension}",
+    "resetToDefaults": "Restaurar padrões"
   },
   "vintageCohorts": {
     "title": "Safras por mês",

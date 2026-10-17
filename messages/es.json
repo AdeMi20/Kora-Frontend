@@ -833,6 +833,12 @@
     "goHome": "Ir al Inicio",
     "goMarketplace": "Ir al Mercado"
   },
+  "globalError": {
+    "title": "Algo salió mal",
+    "description": "Un error crítico impidió que la aplicación se cargara. Recarga la página para intentarlo de nuevo.",
+    "tryAgain": "Intentar de Nuevo",
+    "reload": "Recargar página"
+  },
   "common": {
     "loading": "Cargando…",
     "connectWallet": "Conectar Billetera",
@@ -1218,7 +1224,22 @@
     "snoozeWeek": "Posponer 1 semana",
     "settings": "Ajustar umbrales",
     "critical": "Crítico",
-    "warning": "Advertencia"
+    "warning": "Advertencia",
+    "thresholdsTitle": "Umbrales de concentración",
+    "thresholdsDescription": "Marca tu cartera cuando un solo deudor, jurisdicción o nivel de riesgo supere estas proporciones de su valor.",
+    "dimensions": {
+      "debtor": "Deudor único",
+      "jurisdiction": "Jurisdicción única",
+      "riskTier": "Nivel de riesgo único"
+    },
+    "dimensionHints": {
+      "debtor": "Avisar cuando un deudor supere esta proporción de tu cartera.",
+      "jurisdiction": "Avisar cuando una jurisdicción supere esta proporción de tu cartera.",
+      "riskTier": "Avisar cuando un nivel de riesgo supere esta proporción de tu cartera."
+    },
+    "sliderAria": "Control deslizante del umbral: {dimension}",
+    "percentageAria": "Porcentaje del umbral: {dimension}",
+    "resetToDefaults": "Restablecer valores predeterminados"
   },
   "vintageCohorts": {
     "title": "Cohortes por añada",

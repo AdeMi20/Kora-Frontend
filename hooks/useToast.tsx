@@ -4,7 +4,7 @@ import React from "react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { StellarTxLink } from "@/components/ui/stellar-tx-link";
-import { useUIStore } from "@/store/uiStore";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export type NotificationPreferenceType =
   | "txConfirmed"
@@ -94,7 +94,7 @@ export function ErrorToast({
  * preserved below so its one consumer (`useWatchlistAlerts`) keeps working.
  */
 export function useToast() {
-  const notificationPreferences = useUIStore((s) => s.notificationPreferences);
+  const notificationPreferences = useSettingsStore((s) => s.notifications);
   const t = useTranslations("transaction");
 
   const shouldNotify = (type?: NotificationPreferenceType) => {
