@@ -231,6 +231,15 @@ The kit is instantiated lazily on first use and reused across the session. On di
 
 **Wallet state persistence:** The wallet address and provider are persisted to `localStorage`. On page load, if a stored address exists, the UI shows as connected — but the actual kit session must be re-established on the next transaction (the wallet extension handles this transparently).
 
+**Per-wallet settings persistence:** `settingsStore` keys its persisted bucket by the connected wallet: the zustand persist name rotates to `kora-settings-store-${ADDRESS}` (uppercased/normalised — see `settingsStorageKey()` in `store/settingsStore.ts`). A `SettingsWalletSync` subscriber in `app/providers.tsx` watches `walletStore.address` and calls `setActiveWallet()`, which snapshots the outgoing wallet, rotates the persist key and rehydrates the incoming wallet's bucket. Consequences:
+
+- Two wallets sharing a browser keep independent notification preferences, concentration thresholds, dismissals and tour progress.
+- Switching (or disconnecting then reconnecting) never leaks one profile's thresholds into another; a reconnect restores exactly what that wallet saved.
+- Disconnecting is intentionally a no-op for the active bucket (the settings surface is wallet-gated), so a plain reconnect does not reset the user to defaults.
+- The disconnected bucket keeps the base key `kora-settings-store`; it is also where the one-time migration from the legacy `uiStore`/`invoiceStore` notification copies reads from.
+
+**PWA manifest:** `/manifest.json` is a locale-aware route handler (`app/manifest.json/route.ts` → `lib/pwa/manifest.ts`) rather than a static file, so shortcut labels match the active locale. Shortcut URLs remain locale-agnostic app paths; the locale is carried by the `kora-locale` cookie.
+
 ---
 
 ## Contract Interaction
