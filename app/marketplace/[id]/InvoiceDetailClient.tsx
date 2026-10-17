@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Shield,
+  RefreshCw,
+  WifiOff,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -89,8 +91,72 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [amount, setAmount] = useState("");
   const [funding, setFunding] = useState(false);
   const [fundTxHash, setFundTxHash] = useState<string | null>(null);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [iframeError, setIframeError] = useState(false);
+  type IframeState = "loading" | "loaded" | "error" | "offline";
+  const [iframeState, setIframeState] = useState<IframeState>("loading");
+  // Cache-buster incremented on each retry; appended to the gateway URL so the
+  // browser bypasses cached 4xx/5xx responses.
+  const [iframeRetryKey, setIframeRetryKey] = useState(0);
+  const iframeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Backwards-compat shims used in JSX that referenced the old booleans.
+  const iframeLoaded = iframeState === "loaded";
+  const iframeError = iframeState === "error" || iframeState === "offline";
+
+  /** 15 s gateway timeout — starts when the iframe URL changes (retry or first load). */
+  const startIframeTimeout = useCallback(() => {
+    if (iframeTimeoutRef.current) clearTimeout(iframeTimeoutRef.current);
+    iframeTimeoutRef.current = setTimeout(() => {
+      setIframeState((prev) => {
+        if (prev === "loaded") return prev; // already succeeded
+        // Log without PII — only an anonymised prefix of the invoice id is emitted.
+        const idHint = id.slice(0, 8).replace(/./g, (c, i) => (i > 3 ? "*" : c));
+        console.warn(`[ipfs-preview] Gateway timeout for invoice ${idHint}`);
+        return "error";
+      });
+    }, 15_000);
+  }, [id]);
+
+  /** Clean up the timeout when the component unmounts. */
+  useEffect(() => {
+    return () => {
+      if (iframeTimeoutRef.current) clearTimeout(iframeTimeoutRef.current);
+    };
+  }, []);
+
+  /**
+   * If the user is offline when this component mounts (or goes offline while
+   * the iframe is still loading), immediately show the offline fallback instead
+   * of waiting for the 15 s timeout to fire.
+   */
+  useEffect(() => {
+    if (!isOnline) {
+      setIframeState((prev) => (prev === "loaded" ? prev : "offline"));
+      if (iframeTimeoutRef.current) clearTimeout(iframeTimeoutRef.current);
+    }
+  }, [isOnline]);
+
+  /** Increment the retry key to trigger a new iframe src with a cache-buster. */
+  const handleIframeRetry = useCallback(() => {
+    if (!isOnline) {
+      setIframeState("offline");
+      return;
+    }
+    setIframeState("loading");
+    setIframeRetryKey((k) => k + 1);
+  }, [isOnline]);
+
+  /**
+   * Build the iframe src for the current retry attempt.
+   * A `_cb` query param is appended on retries so the browser fetches a fresh
+   * copy; the `#toolbar=0` fragment keeps PDF chrome hidden.
+   */
+  const buildIframeSrc = useCallback(
+    (baseUrl: string, retryKey: number) => {
+      const cacheBuster = retryKey > 0 ? `?_cb=${retryKey}` : "";
+      return `${baseUrl}${cacheBuster}#toolbar=0&navpanes=0&scrollbar=0`;
+    },
+    [],
+  );
   const { formatCurrency, formatApr, formatDate, formatPercentage } = useFormatters();
   const { executeProtectedAction } = useVerifiedAction();
 
@@ -655,83 +721,164 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <CardContent className="space-y-4">
                   {hasDocument ? (
                     <div className="relative">
+                      {/* ── Desktop: inline iframe preview ─────────────────── */}
                       <div className="hidden sm:block">
                         <div className="overflow-hidden rounded-lg bg-zinc-900 border border-zinc-800">
-                          <iframe
-                            src={`${documentPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                            className="w-full h-[450px] rounded"
-                            title="Invoice PDF Document"
-                            referrerPolicy="no-referrer"
-                            sandbox="allow-scripts allow-same-origin allow-popups"
-                            onLoad={() => setIframeLoaded(true)}
-                            onError={() => setIframeError(true)}
-                          />
-                          {!iframeLoaded && !iframeError && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/50">
-                              <InvoiceDetailSkeleton />
+                          {/* Iframe — only mounted when not in error/offline state */}
+                          {(iframeState === "loading" || iframeState === "loaded") && (
+                            <iframe
+                              key={iframeRetryKey}
+                              src={buildIframeSrc(documentPreviewUrl!, iframeRetryKey)}
+                              className={cn(
+                                "w-full h-[450px] rounded",
+                                iframeState === "loading" && "opacity-0 absolute",
+                              )}
+                              title={t("ipfsPreview")}
+                              aria-label={t("ipfsPreview")}
+                              referrerPolicy="no-referrer"
+                              sandbox="allow-scripts allow-same-origin allow-popups"
+                              onLoad={() => {
+                                if (iframeTimeoutRef.current) clearTimeout(iframeTimeoutRef.current);
+                                setIframeState("loaded");
+                              }}
+                              onError={() => {
+                                if (iframeTimeoutRef.current) clearTimeout(iframeTimeoutRef.current);
+                                const idHint = id.slice(0, 8).replace(/./g, (c, i) => (i > 3 ? "*" : c));
+                                console.warn(`[ipfs-preview] Load error for invoice ${idHint}`);
+                                setIframeState("error");
+                              }}
+                              ref={(el) => {
+                                // Start the 15 s timeout the moment the iframe is mounted.
+                                if (el) startIframeTimeout();
+                              }}
+                            />
+                          )}
+
+                          {/* Loading skeleton */}
+                          {iframeState === "loading" && (
+                            <div
+                              className="flex items-center justify-center h-[450px]"
+                              role="status"
+                              aria-live="polite"
+                            >
+                              <div className="flex flex-col items-center gap-3 text-zinc-500">
+                                <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-400" />
+                                <span className="text-xs">{t("ipfsLoadingPreview")}</span>
+                              </div>
                             </div>
                           )}
-                          {iframeError && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 p-6 text-center">
+
+                          {/* Error / timeout fallback */}
+                          {iframeState === "error" && (
+                            <div
+                              className="flex flex-col items-center justify-center h-[450px] p-6 text-center"
+                              role="alert"
+                              aria-live="assertive"
+                            >
                               <AlertTriangle className="h-8 w-8 text-zinc-400 mb-4" />
-                              <p className="text-sm font-medium text-zinc-400 mb-2">
-                                Document unavailable
+                              <p className="text-sm font-medium text-zinc-300 mb-1">
+                                {t("ipfsErrorTitle")}
                               </p>
-                              <p className="text-xs text-zinc-500 mb-4">
-                                Unable to load the PDF document.
+                              <p className="text-xs text-zinc-500 mb-5 max-w-xs">
+                                {t("ipfsErrorDesc")}
                               </p>
-                              <a
-                                href={documentPreviewUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={handleIframeRetry}
+                                  className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                  {t("ipfsRetry")}
+                                </button>
+                                <a
+                                  href={documentPreviewUrl!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-zinc-300 border border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
+                                >
+                                  {t("ipfsOpenInNewTab")}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Offline fallback */}
+                          {iframeState === "offline" && (
+                            <div
+                              className="flex flex-col items-center justify-center h-[450px] p-6 text-center"
+                              role="alert"
+                              aria-live="assertive"
+                            >
+                              <WifiOff className="h-8 w-8 text-amber-400 mb-4" />
+                              <p className="text-sm font-medium text-amber-300 mb-1">
+                                {t("ipfsOfflineTitle")}
+                              </p>
+                              <p className="text-xs text-zinc-500 mb-5 max-w-xs">
+                                {t("ipfsOfflineDesc")}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={handleIframeRetry}
+                                className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
                               >
-                                Download PDF{" "}
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                {t("ipfsRetry")}
+                              </button>
                             </div>
                           )}
                         </div>
                       </div>
 
+                      {/* ── Mobile: download link only ──────────────────────── */}
                       <div className="block sm:hidden bg-zinc-900 rounded-lg border border-zinc-800 p-6 text-center">
-                        {!iframeLoaded && !iframeError && (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <InvoiceDetailSkeleton />
-                          </div>
-                        )}
-                        {iframeError && (
-                          <div className="flex flex-col items-center justify-center">
-                            <AlertTriangle className="h-8 w-8 text-zinc-400 mb-4" />
-                            <p className="text-sm font-medium text-zinc-400 mb-2">
-                              Document unavailable
+                        {iframeState === "error" ? (
+                          <div className="flex flex-col items-center justify-center gap-4">
+                            <AlertTriangle className="h-8 w-8 text-zinc-400" />
+                            <p className="text-sm font-medium text-zinc-400">
+                              {t("ipfsErrorTitle")}
                             </p>
-                            <p className="text-xs text-zinc-500 mb-4">
-                              Unable to load the PDF document.
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={handleIframeRetry}
+                                className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                {t("ipfsRetry")}
+                              </button>
+                              <a
+                                href={documentPreviewUrl!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
+                              >
+                                {t("ipfsDownloadPdf")} <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                          </div>
+                        ) : iframeState === "offline" ? (
+                          <div className="flex flex-col items-center justify-center gap-4">
+                            <WifiOff className="h-8 w-8 text-amber-400" />
+                            <p className="text-sm font-medium text-amber-300">
+                              {t("ipfsOfflineTitle")}
+                            </p>
+                            <p className="text-xs text-zinc-500">{t("ipfsOfflineDesc")}</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-4">
+                            <FileText className="h-10 w-10 text-zinc-500" />
+                            <p className="text-sm font-medium text-zinc-400">
+                              {t("pdfReady")}
                             </p>
                             <a
-                              href={documentPreviewUrl}
+                              href={documentPreviewUrl!}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
                             >
-                              Download PDF <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        )}
-                        {!iframeError && (
-                          <div className="flex flex-col items-center justify-center">
-                            <FileText className="h-10 w-10 text-zinc-500 mb-4" />
-                            <p className="text-sm font-medium text-zinc-400 mb-2">
-                              PDF ready for download
-                            </p>
-                            <a
-                              href={documentPreviewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-3 py-1.5 font-medium text-zinc-200 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
-                            >
-                              Download PDF <ExternalLink className="h-3 w-3" />
+                              {t("ipfsDownloadPdf")} <ExternalLink className="h-3 w-3" />
                             </a>
                           </div>
                         )}
@@ -741,11 +888,10 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 py-10 text-center">
                       <FileText className="h-8 w-8 text-zinc-600 mb-2" />
                       <p className="text-sm font-medium text-zinc-400">
-                        No document preview available
+                        {t("noDocumentTitle")}
                       </p>
                       <p className="text-xs text-zinc-600 mt-1">
-                        This invoice does not have an attached PDF preview or
-                        document URL.
+                        {t("noDocumentDesc")}
                       </p>
                     </div>
                   )}
