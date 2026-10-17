@@ -497,6 +497,12 @@
     "browseMarketplace": "Explorar Mercado",
     "connectTitle": "Conecta tu billetera",
     "connectDesc": "Conéctate para ver tu portafolio de inversiones",
+    "claim": {
+      "successMessage": "Reclamación enviada",
+      "verificationRequiredTitle": "Verificación requerida",
+      "verificationRequiredDesc": "Verifica la propiedad de tu billetera para reclamar tu rendimiento.",
+      "failedTitle": "Error al reclamar"
+    },
     "stats": {
       "portfolioValue": "Valor del Portafolio",
       "expectedYield": "Rendimiento Esperado",

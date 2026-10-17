@@ -510,6 +510,12 @@
     "browseMarketplace": "Browse Marketplace",
     "connectTitle": "Connect your wallet",
     "connectDesc": "Connect to view your investment portfolio",
+    "claim": {
+      "successMessage": "Claim submitted",
+      "verificationRequiredTitle": "Verification required",
+      "verificationRequiredDesc": "Verify wallet ownership to claim your yield.",
+      "failedTitle": "Claim failed"
+    },
     "stats": {
       "portfolioValue": "Portfolio Value",
       "expectedYield": "Expected Yield",

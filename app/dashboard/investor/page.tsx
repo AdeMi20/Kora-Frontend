@@ -169,7 +169,7 @@ export default function InvestorDashboardPage() {
 
     const runClaim = async () => {
       await execute(() => prepareClaimPosition(pos.id, address), {
-        successMessage: "Claim submitted",
+        successMessage: t("claim.successMessage"),
         // Yield claims are the "yield available" notification channel, not the
         // generic tx one — muting that preference must mute this too.
         successNotificationType: "yieldAvailable",
@@ -189,8 +189,8 @@ export default function InvestorDashboardPage() {
     // the tree to raise the modal — surface the reason rather than failing mute.
     if (result.requiresVerification) {
       toast.error(
-        "Verification required",
-        "Verify wallet ownership to claim your yield.",
+        t("claim.verificationRequiredTitle"),
+        t("claim.verificationRequiredDesc"),
         () => {
           void handleClaim(pos);
         }
@@ -199,7 +199,7 @@ export default function InvestorDashboardPage() {
     }
 
     if (result.error && result.error !== "Wallet not connected") {
-      toast.error("Claim failed", result.error, () => {
+      toast.error(t("claim.failedTitle"), result.error, () => {
         void handleClaim(pos);
       });
     }
