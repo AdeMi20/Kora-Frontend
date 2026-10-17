@@ -14,8 +14,30 @@ The Kora frontend uses a semantic, token-based design system built on Tailwind C
 ## Theming
 
 - **Dark-mode-first** with light mode via the `class` strategy (`darkMode: ["class"]` in Tailwind).
-- Theme switching is handled by `next-themes`; an inline script in `app/layout.tsx` prevents FOUC on first load.
+- The persisted preference (`light` / `dark` / `system`) lives in `uiStore`; an inline bootstrap script in `app/layout.tsx` applies the resolved class before first paint to prevent FOUC.
+- `lib/theme.ts` is the **single source of truth** for theme resolution: `resolveTheme()` is shared by the inline bootstrap script (`THEME_INIT_SCRIPT`) and `components/layout/ThemeProvider.tsx`, so the pre-paint class and the hydrated class can never drift when the OS switches color scheme. A unit test executes the script and compares its result against `resolveTheme` for every preference/OS combination.
 - Color tokens are defined as **HSL components** (e.g. `--color-primary: 174 72% 40%`) and consumed as `hsl(var(--primary))` in Tailwind.
+
+### Browser chrome color (`themeColor`)
+
+The mobile browser UI bar (and PWA title bar) follows the resolved theme via `THEME_COLORS` in `lib/theme.ts`:
+
+| Token | Value | Surface |
+| ----- | ----- | ------- |
+| `THEME_COLORS.light` | `#ffffff` | white page background |
+| `THEME_COLORS.dark` | `#09090b` | zinc-950 dashboard background |
+
+- `app/layout.tsx` exports a media-scoped `viewport.themeColor` (via `buildViewportThemeColor()`) so the server-rendered `<meta name="theme-color">` tags match the OS preference before hydration.
+- After hydration, `ThemeProvider` calls `applyBrowserThemeColor(resolved)`, which forces the resolved color onto every `theme-color` tag — this is what makes an in-app override (e.g. OS light + user-picked dark) win over the OS preference.
+- The manifest's `theme_color` / `background_color` (built in `lib/pwa/manifest.ts`) use the same dark token so the PWA install splash stays consistent. Keep them in sync via `THEME_COLORS`.
+
+### PWA manifest localization
+
+The manifest is served by the `/manifest.json` route handler (`app/manifest.json/route.ts`), not a static file, so it renders for the active `kora-locale`:
+
+- Shortcut **names** reuse the translated navbar labels (`nav.marketplace`, `nav.createInvoice`) so a shortcut's title matches its destination.
+- Shortcut `short_name`, descriptions and screenshot labels come from the `pwa.manifest` message namespace; missing keys fall back to English.
+- Shortcut URLs are **locale-agnostic** app paths (`/marketplace`, `/invoice/create`). The locale lives in the `kora-locale` cookie, never in the URL, so localized manifests must not ship locale-prefixed shortcut paths.
 
 ## Token categories
 
