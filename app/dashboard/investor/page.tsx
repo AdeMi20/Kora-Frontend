@@ -39,6 +39,8 @@ import { InvestorDashboardSkeleton } from "@/components/ui/skeleton";
 import { KycStatusCard } from "@/components/dashboard/KycStatusCard";
 import { StaleDataBadge } from "@/components/layout/StaleDataBadge";
 import { SellerAnalyticsDashboard } from "@/components/analytics/SellerAnalyticsDashboard";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import EmptyState from "@/components/ui/EmptyState";
 
 const DataTable = dynamic<DataTableProps<InvestorPosition>>(
   () => import("@/components/ui/data-table").then((m) => m.DataTable),
@@ -284,6 +286,9 @@ export default function InvestorDashboardPage() {
     );
   }
 
+  // Empty portfolio: connected + success + zero positions
+  const isEmpty = positionsQuery.isSuccess && positionsData.length === 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -297,50 +302,87 @@ export default function InvestorDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.label}
-            label={stat.label}
-            value={stat.value}
-            icon={stat.icon}
-          />
-        ))}
-      </div>
+      {/* Stats row — always visible so the user sees zeros, not nothing */}
+      <ErrorBoundary compact>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCard
+              key={stat.label}
+              label={stat.label}
+              value={stat.value}
+              icon={stat.icon}
+            />
+          ))}
+        </div>
+      </ErrorBoundary>
 
+      {/* KYC card stays visible regardless of positions */}
       <KycStatusCard />
 
-      <ConcentrationRiskAlerts positions={positionsData} />
+      {isEmpty ? (
+        /* ── Empty portfolio state ─────────────────────────────────────── */
+        <EmptyState
+          variant="no-positions"
+          title={t("empty.title")}
+          description={t("empty.description")}
+          cta={{
+            label: t("browseMarketplace"),
+            onClick: () => router.push("/marketplace"),
+          }}
+          data-tour="investor-empty-state"
+        />
+      ) : (
+        <>
+          <ErrorBoundary compact>
+            <ConcentrationRiskAlerts positions={positionsData} />
+          </ErrorBoundary>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("allocation.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PortfolioDonut
-            positions={donutPositions}
-            onSegmentClick={handleSegmentClick}
-          />
-        </CardContent>
-      </Card>
+          {/* Portfolio donut charts */}
+          <ErrorBoundary>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("allocation.title")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PortfolioDonut
+                  positions={donutPositions}
+                  activeFilter={donutFilter}
+                  onSegmentClick={handleSegmentClick}
+                />
+              </CardContent>
+            </Card>
+          </ErrorBoundary>
 
-      <SellerAnalyticsDashboard />
+          {/* Seller analytics — only shown when the investor has active listings */}
+          <ErrorBoundary compact>
+            <SellerAnalyticsDashboard
+              listings={Object.values(listings).filter((l) =>
+                positionsData.some((p) => p.id === l.positionId),
+              )}
+              positions={positionsData}
+            />
+          </ErrorBoundary>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>{t("positions.title")}</CardTitle>
-          <Badge variant="secondary">
-            {t("positions.count", { count: filteredPositions.length })}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            data={filteredPositions}
-            columns={columns}
-            emptyMessage={t("positions.empty")}
-          />
-        </CardContent>
-      </Card>
+          {/* Positions data table */}
+          <ErrorBoundary>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <CardTitle>{t("positions.title")}</CardTitle>
+                <Badge variant="secondary">
+                  {t("positions.count", { count: filteredPositions.length })}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  data={filteredPositions}
+                  columns={columns}
+                  emptyMessage={t("positions.empty")}
+                />
+              </CardContent>
+            </Card>
+          </ErrorBoundary>
+        </>
+      )}
 
       <ListPositionDialog
         open={Boolean(listingTarget)}

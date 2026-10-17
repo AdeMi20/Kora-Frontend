@@ -31,6 +31,7 @@ import { useFormatters } from "@/hooks/useFormatters";
 import { StellarTxLink } from "@/components/ui/stellar-tx-link";
 import { safeStellarTxUrl } from "@/lib/security";
 import EmptyState from "@/components/ui/EmptyState";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useTranslations } from "next-intl";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -311,156 +312,162 @@ export default function TransactionHistoryPage() {
 
       {/* ── Stats ───────────────────────────────────────────────────────── */}
       {transactions.length > 0 && (
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              label: t("stats.total"),
-              value: formatNumber(stats.total),
-              valueRaw: stats.total,
-              icon: <History className="h-4 w-4" />,
-            },
-            {
-              label: t("stats.confirmed"),
-              value: formatNumber(stats.confirmed),
-              valueRaw: stats.confirmed,
-              change: t("stats.failed", { count: stats.failed }),
-              changePositive: stats.failed === 0,
-              icon: <CheckCircle2 className="h-4 w-4" />,
-            },
-            {
-              label: t("stats.totalVolume"),
-              value: formatCurrency(stats.totalVolume, "USDC", true),
-              valueRaw: stats.totalVolume,
-              icon: <ArrowUpRight className="h-4 w-4" />,
-            },
-            {
-              label: t("stats.invoicesFunded"),
-              value: formatNumber(stats.funds),
-              valueRaw: stats.funds,
-              change: t("stats.minted", { count: stats.mints }),
-              changePositive: true,
-              icon: <Coins className="h-4 w-4" />,
-            },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07 }}
-            >
-              <StatCard {...stat} />
-            </motion.div>
-          ))}
-        </div>
+        <ErrorBoundary compact>
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                label: t("stats.total"),
+                value: formatNumber(stats.total),
+                valueRaw: stats.total,
+                icon: <History className="h-4 w-4" />,
+              },
+              {
+                label: t("stats.confirmed"),
+                value: formatNumber(stats.confirmed),
+                valueRaw: stats.confirmed,
+                change: t("stats.failed", { count: stats.failed }),
+                changePositive: stats.failed === 0,
+                icon: <CheckCircle2 className="h-4 w-4" />,
+              },
+              {
+                label: t("stats.totalVolume"),
+                value: formatCurrency(stats.totalVolume, "USDC", true),
+                valueRaw: stats.totalVolume,
+                icon: <ArrowUpRight className="h-4 w-4" />,
+              },
+              {
+                label: t("stats.invoicesFunded"),
+                value: formatNumber(stats.funds),
+                valueRaw: stats.funds,
+                change: t("stats.minted", { count: stats.mints }),
+                changePositive: true,
+                icon: <Coins className="h-4 w-4" />,
+              },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.07 }}
+              >
+                <StatCard {...stat} />
+              </motion.div>
+            ))}
+          </div>
+        </ErrorBoundary>
       )}
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <Card className="mb-6">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input
-              placeholder={t("searchPlaceholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-              aria-label={t("searchAria")}
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label={t("clearSearch")}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            )}
-          </div>
+      <ErrorBoundary compact>
+        <Card className="mb-6">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                placeholder={t("searchPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                aria-label={t("searchAria")}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={t("clearSearch")}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
 
-          {/* Type filter */}
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("typeFilterAria")}>
-            {TYPE_FILTER_VALUES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setTypeFilter(value)}
-                aria-pressed={typeFilter === value}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  typeFilter === value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                )}
-              >
-                {t(`types.${value}` as Parameters<typeof t>[0])}
-              </button>
-            ))}
-          </div>
+            {/* Type filter */}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("typeFilterAria")}>
+              {TYPE_FILTER_VALUES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTypeFilter(value)}
+                  aria-pressed={typeFilter === value}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    typeFilter === value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  )}
+                >
+                  {t(`types.${value}` as Parameters<typeof t>[0])}
+                </button>
+              ))}
+            </div>
 
-          {/* Status filter */}
-          <div className="flex gap-1.5" role="group" aria-label={t("statusFilterAria")}>
-            {STATUS_FILTER_VALUES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setStatusFilter(value)}
-                aria-pressed={statusFilter === value}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  statusFilter === value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                )}
-              >
-                {t(`status.${value}` as Parameters<typeof t>[0])}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            {/* Status filter */}
+            <div className="flex gap-1.5" role="group" aria-label={t("statusFilterAria")}>
+              {STATUS_FILTER_VALUES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  aria-pressed={statusFilter === value}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    statusFilter === value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  )}
+                >
+                  {t(`status.${value}` as Parameters<typeof t>[0])}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </ErrorBoundary>
 
       {/* ── Transaction List ─────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base">
-            {filtered.length === 0
-              ? t("listTitle")
-              : filtered.length === 1
-                ? t("txCount", { count: filtered.length })
-                : t("txCountPlural", { count: filtered.length })}
-          </CardTitle>
-          {filtered.length !== transactions.length && (
-            <span className="text-xs text-muted-foreground">
-              {t("filteredFrom", { total: transactions.length })}
-            </span>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-3 p-4">
-          {filtered.length === 0 ? (
-            transactions.length === 0 ? (
-              <EmptyState
-                title={t("empty.title")}
-                description={t("empty.description")}
-                variant="transactions"
-              />
+      <ErrorBoundary>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">
+              {filtered.length === 0
+                ? t("listTitle")
+                : filtered.length === 1
+                  ? t("txCount", { count: filtered.length })
+                  : t("txCountPlural", { count: filtered.length })}
+            </CardTitle>
+            {filtered.length !== transactions.length && (
+              <span className="text-xs text-muted-foreground">
+                {t("filteredFrom", { total: transactions.length })}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            {filtered.length === 0 ? (
+              transactions.length === 0 ? (
+                <EmptyState
+                  title={t("empty.title")}
+                  description={t("empty.description")}
+                  variant="transactions"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Search className="h-8 w-8 text-muted-foreground" aria-hidden />
+                  <p className="mt-3 text-sm font-medium text-foreground">{t("noResults")}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("noResultsDesc")}
+                  </p>
+                </div>
+              )
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Search className="h-8 w-8 text-muted-foreground" aria-hidden />
-                <p className="mt-3 text-sm font-medium text-foreground">{t("noResults")}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("noResultsDesc")}
-                </p>
-              </div>
-            )
-          ) : (
-            filtered.map((tx) => (
-              <TxRow key={tx.hash} tx={tx} onRemove={removeTransaction} />
-            ))
-          )}
-        </CardContent>
-      </Card>
+              filtered.map((tx) => (
+                <TxRow key={tx.hash} tx={tx} onRemove={removeTransaction} />
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </ErrorBoundary>
     </Container>
   );
 }

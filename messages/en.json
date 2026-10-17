@@ -510,14 +510,34 @@
     "browseMarketplace": "Browse Marketplace",
     "connectTitle": "Connect your wallet",
     "connectDesc": "Connect to view your investment portfolio",
+    "connectWallet": {
+      "title": "Connect your wallet",
+      "description": "Connect to view your investment portfolio and start earning yield."
+    },
+    "error": {
+      "title": "Failed to load portfolio",
+      "description": "We couldn't fetch your positions. Check your connection and try again.",
+      "timeout": "Loading your portfolio is taking longer than usual. Please retry.",
+      "retry": "Retry"
+    },
     "stats": {
       "portfolioValue": "Portfolio Value",
       "expectedYield": "Expected Yield",
+      "expectedReturn": "Expected Return",
+      "yieldEarned": "Yield Earned",
       "activePositions": "Active Positions",
       "avgApr": "Avg. APR",
       "activePositionsChange": "{count} active positions",
       "returnChange": "{percent}% return",
       "acrossPositions": "Across all positions"
+    },
+    "allocation": {
+      "title": "Portfolio Allocation"
+    },
+    "positions": {
+      "title": "Your Positions",
+      "count": "{count} position",
+      "empty": "No positions match the current filter."
     },
     "table": {
       "invoice": "Invoice",
@@ -535,7 +555,8 @@
     "allocationRisk": "Allocation by Risk Tier",
     "allocationJurisdiction": "Allocation by Jurisdiction",
     "empty": {
-      "title": "No positions",
+      "title": "No positions yet",
+      "description": "Fund invoices on the marketplace to start building your portfolio.",
       "message": "Fund invoices on the marketplace to build your portfolio."
     },
     "fundTestnet": "Fund Testnet Account"
@@ -956,7 +977,51 @@
     "connectDesc": "Settings are stored per wallet. Connect to view and change your preferences.",
     "connectCta": "Connect wallet",
     "navLabel": "Settings",
-    "openFull": "Open full settings"
+    "openFull": "Open full settings",
+    "notifications": {
+      "sectionTitle": "Notification Preferences",
+      "sectionDesc": "Control which in-app alerts appear during your workflow.",
+      "maturityReminder": {
+        "label": "Maturity Reminders",
+        "description": "Remind you before invoice maturity date."
+      },
+      "fundingAlerts": {
+        "label": "Funding Alerts",
+        "description": "Notify when your invoice reaches funding milestones."
+      },
+      "repaymentAlerts": {
+        "label": "Repayment Alerts",
+        "description": "Notify when repayment is due or completed."
+      },
+      "reminderTiming": {
+        "label": "Reminder timing",
+        "description": "Choose when to alert before maturity date.",
+        "day1": "1 day before maturity",
+        "day3": "3 days before maturity",
+        "day7": "7 days before maturity"
+      },
+      "resetDefaults": "Reset to defaults",
+      "toggleAriaLabel": "Toggle {label}",
+      "tourSection": {
+        "title": "Onboarding Tour"
+      },
+      "shortcutsSection": {
+        "title": "Keyboard Shortcuts",
+        "description": "Enable global keyboard shortcuts for faster navigation.",
+        "enableLabel": "Enable shortcuts",
+        "enableDesc": "Press {key} to view all shortcuts.",
+        "toggleAriaLabel": "Toggle keyboard shortcuts"
+      },
+      "diagnosticsSection": {
+        "title": "Support Diagnostics",
+        "description": "Export a redacted wallet session snapshot with network and feature-flag state.",
+        "exportButton": "Export diagnostics JSON",
+        "importButton": "Import diagnostics",
+        "exportNote": "Export includes provider, network, kit session flags, and feature flags. No secrets, seed phrases, JWTs, or full addresses are included.",
+        "importSuccess": "Diagnostics imported for local debug.",
+        "importFailed": "Diagnostics import failed."
+      }
+    }
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
