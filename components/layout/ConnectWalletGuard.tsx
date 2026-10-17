@@ -27,6 +27,8 @@ function IntendedDestinationSetter() {
         "/invoice/create",
         "/dashboard/sme",
         "/dashboard/investor",
+        "/secondary",
+        "/analytics",
       ].some((p) => pathname === p || pathname.startsWith(p + "/"));
 
       if (isProtectedRoute) {
@@ -83,7 +85,7 @@ export function ConnectWalletGuard({ children }: { children: React.ReactNode }) 
 
   if (
     !isConnected &&
-    ["/invoice/create", "/dashboard/sme", "/dashboard/investor"].some(
+    ["/invoice/create", "/dashboard/sme", "/dashboard/investor", "/secondary", "/analytics"].some(
       (p) => pathname === p || pathname.startsWith(p + "/")
     )
   ) {
