@@ -9,7 +9,6 @@ import {
   Tag,
   Percent,
   User,
-  ShieldAlert,
   ArrowRight,
   RotateCcw,
   Copy,
@@ -36,7 +35,6 @@ import { env } from "@/lib/env";
 import { computeAcquisitionFees, getFeeSchedule } from "@/lib/secondaryFees";
 import { usePositionListingStore } from "@/store/positionListingStore";
 import { useInvoiceStore } from "@/store/invoiceStore";
-import { MOCK_INVOICES } from "@/services/mockData";
 import { RISK_TIER_COLORS, cn } from "@/lib/utils";
 import { computeImpliedDiscount } from "@/types/invoice";
 import type { Invoice, PositionListing } from "@/types/invoice";
@@ -46,6 +44,7 @@ import { useFormatters } from "@/hooks/useFormatters";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { sanitizeQueryParam } from "@/lib/security";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useFeatureFlag } from "@/lib/featureFlags";
 import {
   parseSecondaryFiltersFromSearchParams,
   secondaryFiltersToQueryString,
@@ -59,7 +58,7 @@ import {
   type SecondarySortBy,
 } from "@/lib/secondarySort";
 
-interface SecondaryMarketItem {
+export interface SecondaryMarketItem {
   listing: PositionListing;
   positionId: string;
   invoice: Invoice;
@@ -70,190 +69,10 @@ interface SecondaryMarketItem {
   yieldPercent: number;
 }
 
-// Default mock secondary market listings for initial browse experience
-const MOCK_SECONDARY_LISTINGS: SecondaryMarketItem[] = [
-  {
-    listing: {
-      positionId: "pos_101",
-      askPrice: 4850,
-      impliedDiscount: computeImpliedDiscount(4850, 5000),
-      listedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    },
-    positionId: "pos_101",
-    invoice: MOCK_INVOICES[0] || {
-      id: "inv_1",
-      tokenId: "101",
-      contractAddress: "C123",
-      ipfsCid: "QmTest1",
-      metadata: {
-        invoiceNumber: "INV-2026-001",
-        issuerName: "TechCorp Ltd",
-        issuerAddress: "GABC...1234",
-        debtorName: "Global Logistics Inc",
-        debtorAddress: "GDEF...5678",
-        amount: 5000,
-        currency: "USDC",
-        issueDate: "2026-06-01T00:00:00Z",
-        dueDate: new Date(Date.now() + 86400000 * 45).toISOString(),
-        description: "Enterprise software licenses",
-        jurisdiction: "US",
-        category: "technology",
-        documentHash: "QmTest1",
-        documentUrl: "https://gateway.pinata.cloud/ipfs/QmTest1",
-      },
-      terms: {
-        discountRate: 0.08,
-        apr: 12.5,
-        financingAmount: 5000,
-        minInvestment: 100,
-        maxInvestment: 5000,
-        tenor: 45,
-        repaymentDate: new Date(Date.now() + 86400000 * 45).toISOString(),
-      },
-      funding: {
-        totalRaised: 5000,
-        targetAmount: 5000,
-        fundingProgress: 1,
-        investorCount: 2,
-        remainingCapacity: 0,
-      },
-      riskTier: "AA",
-      riskScore: 88,
-      debtorPrivacy: "full",
-      status: "active",
-      createdAt: "2026-06-01T00:00:00Z",
-      updatedAt: "2026-06-02T00:00:00Z",
-      ownerAddress: "GSELLER...0001",
-    },
-    investedAmount: 4600,
-    expectedReturn: 5000,
-    sellerAddress: "GSELLER1111111111111111111111111111111111111111111",
-    remainingTenor: 45,
-    yieldPercent: ((5000 - 4850) / 4850) * 100,
-  },
-  {
-    listing: {
-      positionId: "pos_102",
-      askPrice: 9700,
-      impliedDiscount: computeImpliedDiscount(9700, 10200),
-      listedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    },
-    positionId: "pos_102",
-    invoice: MOCK_INVOICES[1] || {
-      id: "inv_2",
-      tokenId: "102",
-      contractAddress: "C123",
-      ipfsCid: "QmTest2",
-      metadata: {
-        invoiceNumber: "INV-2026-002",
-        issuerName: "AgriExport Co",
-        issuerAddress: "GXYZ...9999",
-        debtorName: "Metro Foods Supermarkets",
-        debtorAddress: "GKLM...4321",
-        amount: 10200,
-        currency: "USDC",
-        issueDate: "2026-06-10T00:00:00Z",
-        dueDate: new Date(Date.now() + 86400000 * 20).toISOString(),
-        description: "Fresh produce shipment",
-        jurisdiction: "KE",
-        category: "agriculture",
-        documentHash: "QmTest2",
-        documentUrl: "https://gateway.pinata.cloud/ipfs/QmTest2",
-      },
-      terms: {
-        discountRate: 0.06,
-        apr: 14.2,
-        financingAmount: 10000,
-        minInvestment: 500,
-        maxInvestment: 10000,
-        tenor: 20,
-        repaymentDate: new Date(Date.now() + 86400000 * 20).toISOString(),
-      },
-      funding: {
-        totalRaised: 10000,
-        targetAmount: 10000,
-        fundingProgress: 1,
-        investorCount: 4,
-        remainingCapacity: 0,
-      },
-      riskTier: "A",
-      riskScore: 79,
-      debtorPrivacy: "partial",
-      status: "active",
-      createdAt: "2026-06-10T00:00:00Z",
-      updatedAt: "2026-06-11T00:00:00Z",
-      ownerAddress: "GSELLER...0002",
-    },
-    investedAmount: 9500,
-    expectedReturn: 10200,
-    sellerAddress: "GSELLER2222222222222222222222222222222222222222222",
-    remainingTenor: 20,
-    yieldPercent: ((10200 - 9700) / 9700) * 100,
-  },
-  {
-    listing: {
-      positionId: "pos_103",
-      askPrice: 2400,
-      impliedDiscount: computeImpliedDiscount(2400, 2550),
-      listedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-    },
-    positionId: "pos_103",
-    invoice: MOCK_INVOICES[2] || {
-      id: "inv_3",
-      tokenId: "103",
-      contractAddress: "C123",
-      ipfsCid: "QmTest3",
-      metadata: {
-        invoiceNumber: "INV-2026-003",
-        issuerName: "MediHealth Supplies",
-        issuerAddress: "GHJK...7777",
-        debtorName: "City General Hospital",
-        debtorAddress: "GOPQ...8888",
-        amount: 2550,
-        currency: "USDC",
-        issueDate: "2026-05-15T00:00:00Z",
-        dueDate: new Date(Date.now() + 86400000 * 75).toISOString(),
-        description: "Medical equipment maintenance",
-        jurisdiction: "NG",
-        category: "healthcare",
-        documentHash: "QmTest3",
-        documentUrl: "https://gateway.pinata.cloud/ipfs/QmTest3",
-      },
-      terms: {
-        discountRate: 0.1,
-        apr: 16.8,
-        financingAmount: 2400,
-        minInvestment: 100,
-        maxInvestment: 2400,
-        tenor: 75,
-        repaymentDate: new Date(Date.now() + 86400000 * 75).toISOString(),
-      },
-      funding: {
-        totalRaised: 2400,
-        targetAmount: 2400,
-        fundingProgress: 1,
-        investorCount: 1,
-        remainingCapacity: 0,
-      },
-      riskTier: "BBB",
-      riskScore: 71,
-      debtorPrivacy: "full",
-      status: "active",
-      createdAt: "2026-05-15T00:00:00Z",
-      updatedAt: "2026-05-16T00:00:00Z",
-      ownerAddress: "GSELLER...0003",
-    },
-    investedAmount: 2300,
-    expectedReturn: 2550,
-    sellerAddress: "GSELLER3333333333333333333333333333333333333333333",
-    remainingTenor: 75,
-    yieldPercent: ((2550 - 2400) / 2400) * 100,
-  },
-];
-
 function SecondaryMarketplaceContent() {
   const t = useTranslations("secondaryMarket");
   const { formatCurrency, formatPercentage } = useFormatters();
+  const secondaryEnabled = useFeatureFlag("secondary-market");
 
   // Issue #594: acquire runs through the same simulation gate as fund/transfer.
   const { acquirePosition, simulationDialogProps } = useAcquirePositionFlow();
@@ -343,38 +162,43 @@ function SecondaryMarketplaceContent() {
     });
   }, []);
 
-  // Combine store position listings with mock defaults
+  // Build the item list purely from the persisted store + the invoice store.
+  // No inline mock array: in mock mode the service layer populates invoices
+  // via usePositions/useInvoiceStore; in live mode it hits the RPC.
   const allItems: SecondaryMarketItem[] = useMemo(() => {
-    const combined = [...MOCK_SECONDARY_LISTINGS];
+    const items: SecondaryMarketItem[] = [];
 
     Object.values(storeListings).forEach((listing) => {
-      if (combined.some((item) => item.positionId === listing.positionId)) return;
       const relatedInv = invoices.find(
         (inv) => inv.id === listing.positionId || inv.tokenId === listing.positionId
       );
-      if (relatedInv) {
-        const expectedReturn =
-          relatedInv.terms.financingAmount * (1 + relatedInv.terms.discountRate);
-        const investedAmount = relatedInv.terms.financingAmount;
-        const due = new Date(relatedInv.terms.repaymentDate).getTime();
-        const daysLeft = Math.max(0, Math.ceil((due - Date.now()) / (1000 * 60 * 60 * 24)));
-        const yieldPercent =
-          listing.askPrice > 0 ? ((expectedReturn - listing.askPrice) / listing.askPrice) * 100 : 0;
+      if (!relatedInv) return;
 
-        combined.push({
-          listing,
-          positionId: listing.positionId,
-          invoice: relatedInv,
-          investedAmount,
-          expectedReturn,
-          sellerAddress: relatedInv.ownerAddress,
-          remainingTenor: daysLeft,
-          yieldPercent,
-        });
-      }
+      const expectedReturn =
+        relatedInv.terms.financingAmount * (1 + relatedInv.terms.discountRate);
+      const investedAmount = relatedInv.terms.financingAmount;
+      const due = new Date(relatedInv.terms.repaymentDate).getTime();
+      const daysLeft = Math.max(0, Math.ceil((due - Date.now()) / (1000 * 60 * 60 * 24)));
+      const askPrice = listing.askPrice;
+      const yieldPercent =
+        askPrice > 0 ? ((expectedReturn - askPrice) / askPrice) * 100 : 0;
+
+      items.push({
+        listing: {
+          ...listing,
+          impliedDiscount: listing.impliedDiscount ?? computeImpliedDiscount(askPrice, expectedReturn),
+        },
+        positionId: listing.positionId,
+        invoice: relatedInv,
+        investedAmount,
+        expectedReturn,
+        sellerAddress: relatedInv.ownerAddress,
+        remainingTenor: daysLeft,
+        yieldPercent,
+      });
     });
 
-    return combined;
+    return items;
   }, [storeListings, invoices]);
 
   // Filter items
@@ -433,6 +257,22 @@ function SecondaryMarketplaceContent() {
     setYieldFilter(DEFAULT_SECONDARY_FILTERS.yield);
     setSellerFilter(DEFAULT_SECONDARY_FILTERS.seller);
   };
+
+  // Feature flag off: show maintenance empty state
+  if (!secondaryEnabled) {
+    return (
+      <div className="min-h-screen bg-zinc-950 py-8 text-zinc-100">
+        <Container>
+          <EmptyState
+            title={t("disabledTitle")}
+            description={t("disabledDesc")}
+            cta={{ label: t("exploreMarketplace"), onClick: () => router.push("/marketplace") }}
+            variant="no-results"
+          />
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 py-8 text-zinc-100">
@@ -554,9 +394,10 @@ function SecondaryMarketplaceContent() {
                   size="sm"
                   onClick={resetFilters}
                   className="text-xs text-zinc-400 hover:text-white"
+                  aria-label={t("resetAria")}
                 >
                   <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                  Reset
+                  {t("reset")}
                 </Button>
               )}
             </div>
@@ -570,7 +411,7 @@ function SecondaryMarketplaceContent() {
                 className="w-full border-zinc-800 bg-zinc-950/80 text-xs"
               >
                 <SlidersHorizontal className="mr-2 h-3.5 w-3.5 text-primary" />
-                Filter Positions
+                {t("filterPositions")}
                 {hasActiveFilters && (
                   <Badge variant="outline" className="ml-2 bg-primary/20 text-primary text-[10px]">
                     {t("active")}
@@ -581,16 +422,27 @@ function SecondaryMarketplaceContent() {
           </div>
         </div>
 
-        {/* Position Listings Grid */}
+        {/* Position Listings Grid — empty state when no listings or no filter matches */}
         {sortedItems.length === 0 ? (
-          <EmptyState
-            title={t("emptyTitle")}
-            description={t("emptyDesc")}
-            cta={{ label: t("clearFilters"), onClick: resetFilters }}
-          />
+          allItems.length === 0 ? (
+            /* True empty market — no listings at all */
+            <EmptyState
+              title={t("emptyTitle")}
+              description={t("emptyDesc")}
+              variant="no-positions"
+            />
+          ) : (
+            /* Filters produced zero results — offer to clear */
+            <EmptyState
+              title={t("emptyTitle")}
+              description={t("emptyDesc")}
+              cta={{ label: t("clearFilters"), onClick: resetFilters }}
+              variant="no-results"
+            />
+          )
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => {
+            {sortedItems.map((item) => {
               const riskColor = RISK_TIER_COLORS[item.invoice.riskTier] ?? "text-zinc-400 border-zinc-700";
               const isHighlighted = Boolean(highlightId && item.positionId === highlightId);
 
@@ -598,6 +450,11 @@ function SecondaryMarketplaceContent() {
                 <Card
                   key={item.positionId}
                   id={`listing-${item.positionId}`}
+                  aria-label={
+                    item.listing.impliedDiscount != null && item.listing.impliedDiscount < 0
+                      ? t("listingAriaStale", { invoiceNumber: item.invoice.metadata.invoiceNumber })
+                      : t("listingAria", { invoiceNumber: item.invoice.metadata.invoiceNumber })
+                  }
                   className={cn(
                     "group relative overflow-hidden border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm transition-all duration-200 hover:border-primary/50 hover:bg-zinc-900/80 hover:shadow-lg hover:shadow-primary/5",
                     isHighlighted && "ring-2 ring-primary/60 border-primary/60"
@@ -654,7 +511,7 @@ function SecondaryMarketplaceContent() {
                         <div className="flex items-center justify-between text-zinc-400">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5 text-primary/80" />
-                            Remaining Tenor:
+                            {t("remainingTenor")}:
                           </span>
                           <span className="font-medium text-white">
                             {t("daysRemaining", { days: item.remainingTenor })}
@@ -664,17 +521,17 @@ function SecondaryMarketplaceContent() {
                         <div className="flex items-center justify-between text-zinc-400">
                           <span className="flex items-center gap-1.5">
                             <Tag className="h-3.5 w-3.5 text-emerald-400" />
-                            Implied Discount:
+                            {t("impliedDiscount")}:
                           </span>
                           <span className="font-medium text-emerald-400">
-                            {formatPercentage(item.listing.impliedDiscount * 100, 1)}
+                            {formatPercentage((item.listing.impliedDiscount ?? 0) * 100, 1)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between text-zinc-400">
                           <span className="flex items-center gap-1.5">
                             <User className="h-3.5 w-3.5 text-zinc-400" />
-                            Seller Address:
+                            {t("sellerAddress")}:
                           </span>
                           <span className="font-mono text-[11px] text-zinc-300">
                             {item.sellerAddress.slice(0, 4)}...{item.sellerAddress.slice(-4)}
@@ -777,7 +634,7 @@ function SecondaryMarketplaceContent() {
           <div className="space-y-4 p-4 text-zinc-100">
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Remaining Tenor</label>
+                <label className="text-xs text-zinc-400 mb-1 block">{t("mobileTenorLabel")}</label>
                 <Select
                   value={tenorFilter}
                   onChange={(val) => setTenorFilter(sanitizeQueryParam(val))}
@@ -787,7 +644,7 @@ function SecondaryMarketplaceContent() {
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Minimum Yield</label>
+                <label className="text-xs text-zinc-400 mb-1 block">{t("mobileYieldLabel")}</label>
                 <Select
                   value={yieldFilter}
                   onChange={(val) => setYieldFilter(sanitizeQueryParam(val))}
@@ -797,9 +654,9 @@ function SecondaryMarketplaceContent() {
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Seller Address</label>
+                <label className="text-xs text-zinc-400 mb-1 block">{t("mobileSellerLabel")}</label>
                 <Input
-                  placeholder="Seller G-address..."
+                  placeholder={t("sellerPlaceholder")}
                   value={sellerFilter}
                   onChange={(e) => setSellerFilter(sanitizeQueryParam(e.target.value))}
                   className="border-zinc-800 bg-zinc-900 text-xs"

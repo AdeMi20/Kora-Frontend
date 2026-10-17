@@ -497,6 +497,12 @@
     "browseMarketplace": "Explorar Mercado",
     "connectTitle": "Conecte sua carteira",
     "connectDesc": "Conecte para visualizar sua carteira de investimentos",
+    "claim": {
+      "successMessage": "Reivindicação enviada",
+      "verificationRequiredTitle": "Verificação necessária",
+      "verificationRequiredDesc": "Verifique a propriedade da carteira para reivindicar seu rendimento.",
+      "failedTitle": "Falha ao reivindicar"
+    },
     "stats": {
       "portfolioValue": "Valor da Carteira",
       "expectedYield": "Rendimento Esperado",

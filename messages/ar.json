@@ -497,6 +497,12 @@
     "browseMarketplace": "تصفح السوق",
     "connectTitle": "ربط محفظتك",
     "connectDesc": "ربط المحفظة لعرض محفظة استثماراتك",
+    "claim": {
+      "successMessage": "تم تقديم الطلب",
+      "verificationRequiredTitle": "التحقق مطلوب",
+      "verificationRequiredDesc": "تحقق من ملكية المحفظة للمطالبة بعائدك.",
+      "failedTitle": "فشل الطلب"
+    },
     "stats": {
       "portfolioValue": "قيمة المحفظة",
       "expectedYield": "العائد المتوقع",

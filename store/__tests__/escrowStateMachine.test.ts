@@ -31,8 +31,10 @@ describe("Escrow State Machine", () => {
     expect(state.errorStep).toBe("buyer_funding");
     expect(state.errorMessage).toBe("Insufficient funds");
 
-    // Transitioning to a new step should clear errors
-    store.setEscrowStep("buyer_funded");
+    // Transitioning back to an active retry step clears the error; transitioning
+    // to the *next* non-retry step (e.g. buyer_funded) does not, because the
+    // store only auto-clears when entering buyer_funding or seller_transferring.
+    store.setEscrowStep("buyer_funding");
     state = useTransactionStore.getState().escrowState;
     expect(state.errorStep).toBe(null);
     expect(state.errorMessage).toBe(null);
