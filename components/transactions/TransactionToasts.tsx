@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react"
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { StellarTxLink } from "@/components/ui/stellar-tx-link";
-import { useUIStore } from "@/store/uiStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { toast } from "sonner";
 import type { NotificationPreferenceType } from "@/hooks/useToast";
 import { useTxAnnouncement } from "@/hooks/useTransaction";
@@ -189,7 +189,7 @@ export function TransactionAnnouncer() {
 }
 
 export function useTransactionToast() {
-  const notificationPreferences = useUIStore((s) => s.notificationPreferences);
+  const notificationPreferences = useSettingsStore((s) => s.notifications);
 
   const shouldNotify = (type?: NotificationPreferenceType) => {
     if (!type) return true;

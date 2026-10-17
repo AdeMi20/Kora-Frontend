@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Invoice } from "@/types";
 import { useInvoiceStore } from "@/store";
+import { useSettingsStore, type NotificationPrefs } from "@/store/settingsStore";
 import { useToast } from "@/hooks/useToast";
 
 type Snapshot = Pick<Invoice, "status"> & {
@@ -13,7 +14,7 @@ type Snapshot = Pick<Invoice, "status"> & {
 export function getAlertMessage(
   invoice: Invoice,
   previous: Snapshot | undefined,
-  preferences: ReturnType<typeof useInvoiceStore.getState>["notificationPreferences"]
+  preferences: NotificationPrefs
 ): string | null {
   if (!previous) return null;
   if (preferences.status && previous.status !== invoice.status) {
@@ -39,7 +40,7 @@ function snapshot(invoice: Invoice): Snapshot {
 export function useWatchlistAlerts() {
   const invoices = useInvoiceStore((state) => state.invoices);
   const watchedInvoiceIds = useInvoiceStore((state) => state.watchedInvoiceIds);
-  const preferences = useInvoiceStore((state) => state.notificationPreferences);
+  const preferences = useSettingsStore((state) => state.notifications);
   const previous = useRef<Record<string, Snapshot>>({});
   const { info } = useToast();
 

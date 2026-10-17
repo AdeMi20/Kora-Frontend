@@ -26,7 +26,7 @@ import {
   WarningTransactionToast,
   useTransactionToast,
 } from "../TransactionToasts";
-import { useUIStore } from "@/store/uiStore";
+import { useSettingsStore, DEFAULT_NOTIFICATION_PREFS } from "@/store/settingsStore";
 
 // Mock environment variable
 const originalEnv = process.env.NEXT_PUBLIC_STELLAR_NETWORK;
@@ -331,14 +331,9 @@ describe("TransactionToasts - Hook", () => {
 
   beforeEach(() => {
     (process.env as any).NEXT_PUBLIC_STELLAR_NETWORK = "testnet";
-    // Reset UI store preferences
-    useUIStore.setState({
-      notificationPreferences: {
-        txConfirmed: true,
-        invoiceFunded: true,
-        maturityReminder: true,
-        yieldAvailable: true,
-      },
+    // Reset canonical notification preferences
+    useSettingsStore.setState({
+      notifications: { ...DEFAULT_NOTIFICATION_PREFS },
     });
   });
 
@@ -355,14 +350,12 @@ describe("TransactionToasts - Hook", () => {
   });
 
   it("should respect notification preferences", () => {
-    // This requires mocking sonner and useUIStore
+    // This requires mocking sonner and the canonical settings store
     // The implementation already checks notificationPreferences
-    useUIStore.setState({
-      notificationPreferences: {
+    useSettingsStore.setState({
+      notifications: {
+        ...DEFAULT_NOTIFICATION_PREFS,
         txConfirmed: false,
-        invoiceFunded: true,
-        maturityReminder: true,
-        yieldAvailable: true,
       },
     });
 

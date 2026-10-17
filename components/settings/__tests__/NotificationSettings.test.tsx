@@ -24,7 +24,7 @@ const { restartTour, exportWalletDiagnostics, importWalletDiagnostics } = vi.hoi
 }));
 
 vi.mock("@/hooks/useWallet", () => ({
-  useWallet: () => ({ exportWalletDiagnostics, importWalletDiagnostics }),
+  useWallet: () => ({ address: null, exportWalletDiagnostics, importWalletDiagnostics }),
 }));
 
 // next-intl needs a provider; the copy under test is the English strings in

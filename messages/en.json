@@ -858,6 +858,12 @@
     "goHome": "Go Home",
     "goMarketplace": "Go to Marketplace"
   },
+  "globalError": {
+    "title": "Something went wrong",
+    "description": "A critical error stopped the application from loading. Reload the page to try again.",
+    "tryAgain": "Try Again",
+    "reload": "Reload page"
+  },
   "common": {
     "loading": "Loading…",
     "connectWallet": "Connect Wallet",
@@ -1230,7 +1236,22 @@
     "diversifyCta": "Find diversification options",
     "settings": "Adjust thresholds",
     "critical": "Critical",
-    "warning": "Warning"
+    "warning": "Warning",
+    "thresholdsTitle": "Concentration thresholds",
+    "thresholdsDescription": "Flag your portfolio when a single debtor, jurisdiction, or risk tier exceeds these shares of its value.",
+    "dimensions": {
+      "debtor": "Single debtor",
+      "jurisdiction": "Single jurisdiction",
+      "riskTier": "Single risk tier"
+    },
+    "dimensionHints": {
+      "debtor": "Alert when one debtor exceeds this share of your portfolio.",
+      "jurisdiction": "Alert when one jurisdiction exceeds this share of your portfolio.",
+      "riskTier": "Alert when one risk tier exceeds this share of your portfolio."
+    },
+    "sliderAria": "{dimension} threshold slider",
+    "percentageAria": "{dimension} threshold percentage",
+    "resetToDefaults": "Reset to defaults"
   },
   "vintageCohorts": {
     "title": "Vintage cohorts",

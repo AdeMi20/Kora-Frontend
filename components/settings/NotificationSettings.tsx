@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Compass, Download, Keyboard, RotateCcw, Upload } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useUIStore } from "@/store/uiStore";
@@ -64,12 +64,27 @@ function Toggle({
 
 export function NotificationSettings() {
   const t = useTranslations("onboarding");
-  const { notifications, setNotifications, resetNotifications, tour, setTourSettings, restartTour } = useSettingsStore();
+  const {
+    notifications,
+    setNotifications,
+    resetNotifications,
+    tour,
+    setTourSettings,
+    restartTour,
+    setActiveWallet,
+  } = useSettingsStore();
   const shortcutsEnabled = useUIStore((s) => s.shortcutsEnabled);
   const setShortcutsEnabled = useUIStore((s) => s.setShortcutsEnabled);
-  const { exportWalletDiagnostics, importWalletDiagnostics } = useWallet();
+  const { address, exportWalletDiagnostics, importWalletDiagnostics } = useWallet();
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Notification preferences are scoped per wallet; bind the store's active
+  // wallet to the connected one so this surface and the wallet dropdown read
+  // and write the same record.
+  useEffect(() => {
+    setActiveWallet(address ?? null);
+  }, [address, setActiveWallet]);
 
   const handleExportDiagnostics = () => {
     const payload = exportWalletDiagnostics();
