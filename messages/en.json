@@ -49,7 +49,12 @@
     "reconnect": "Reconnect Wallet",
     "reconnecting": "Reconnecting...",
     "restoringSession": "Restoring wallet session...",
-    "balanceLoadFailed": "Failed to load balances"
+    "balanceLoadFailed": "Failed to load balances",
+    "walletConnected": "Wallet connected",
+    "redirecting": "Taking you to your dashboard…",
+    "mobileApp": "Mobile app",
+    "openInApp": "Open in app",
+    "deepLinkWaiting": "Waiting for wallet app to open…"
   },
   "transaction": {
     "building": "Building transaction…",
@@ -812,7 +817,14 @@
     "statusSuccess": "Submitted",
     "statusError": "Failed",
     "statusPending": "Queued",
-    "badgeAriaLabel": "{count} pending transaction(s)"
+    "statusExhausted": "Max retries reached",
+    "badgeAriaLabel": "{count} pending transaction(s)",
+    "retryIn": "Retry in {seconds}s",
+    "retryExhausted": "Maximum retries reached",
+    "retryExhaustedDesc": "This transaction could not be submitted after 5 attempts. Copy the signed XDR to resubmit manually, or discard it.",
+    "copyXdrAriaLabel": "Copy signed XDR to clipboard",
+    "xdrCopied": "Signed XDR copied to clipboard",
+    "xdrCopyFailed": "Failed to copy XDR"
   },
   "notFound": {
     "title": "Page not found",

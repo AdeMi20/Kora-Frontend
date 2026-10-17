@@ -61,27 +61,27 @@ function statusIcon(status: BatchItemStatus) {
 
 function statusLabel(status: BatchItemStatus): string {
   switch (status) {
-    case "success":   return "Success";
-    case "failed":    return "Failed";
+    case "success":    return "Success";
+    case "failed":     return "Failed";
     case "processing": return "Processing…";
-    case "skipped":   return "Skipped";
-    default:          return "Pending";
+    case "skipped":    return "Skipped";
+    default:           return "Pending";
   }
 }
 
 function statusRowClass(status: BatchItemStatus): string {
   switch (status) {
-    case "success":   return "bg-emerald-950/30 border-emerald-800/30";
-    case "failed":    return "bg-destructive/5 border-destructive/20";
+    case "success":    return "bg-emerald-950/30 border-emerald-800/30";
+    case "failed":     return "bg-destructive/5 border-destructive/20";
     case "processing": return "bg-primary/5 border-primary/20";
-    default:          return "bg-zinc-900/40 border-zinc-800/40";
+    default:           return "bg-zinc-900/40 border-zinc-800/40";
   }
 }
 
 function actionIcon(action: BatchQueueItem["action"]) {
   return action === "repay"
     ? <Banknote className="h-3 w-3 text-zinc-500 shrink-0" aria-hidden="true" />
-    : <XCircle className="h-3 w-3 text-zinc-500 shrink-0" aria-hidden="true" />;
+    : <XCircle  className="h-3 w-3 text-zinc-500 shrink-0" aria-hidden="true" />;
 }
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
@@ -126,9 +126,11 @@ export function BatchTxQueuePanel({
 
   // Accessible live-region: announce status changes
   const [announcement, setAnnouncement] = useState("");
+  const liveRef = useRef<HTMLDivElement>(null);
   const prevProcessed = useRef(processed);
   const prevIsDone = useRef(isDone);
   const prevFailedCount = useRef(failedCount);
+
   useEffect(() => {
     if (isDone && !prevIsDone.current) {
       setAnnouncement(
@@ -171,7 +173,7 @@ export function BatchTxQueuePanel({
         aria-live="polite"
         aria-atomic="true"
         className="sr-only"
-        data-testid="batch-tx-queue-live-region"
+        data-testid="batch-panel-live-region"
       >
         {announcement}
       </div>
@@ -248,7 +250,7 @@ export function BatchTxQueuePanel({
           >
             {collapsed
               ? <ChevronDown className="h-4 w-4" />
-              : <ChevronUp className="h-4 w-4" />}
+              : <ChevronUp   className="h-4 w-4" />}
           </button>
         </div>
       </div>
@@ -269,27 +271,43 @@ export function BatchTxQueuePanel({
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.ul
+            key="item-list"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="divide-y divide-zinc-800/40 overflow-hidden"
-            data-testid="batch-panel-items"
+            data-testid="batch-panel-item-list"
           >
             {items.map((item) => (
               <li
                 key={item.id}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 border-l-2",
+                  "flex items-start gap-2 px-4 py-2 border-l-2",
                   statusRowClass(item.status),
                 )}
-                data-testid={`batch-panel-item-${item.id}`}
+                data-testid={`batch-item-${item.id}`}
+                data-status={item.status}
               >
                 {statusIcon(item.status)}
                 {actionIcon(item.action)}
-                <span className="text-xs text-zinc-300 truncate flex-1 min-w-0">
-                  {item.label}
-                </span>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-xs text-zinc-300 truncate block">
+                    {item.label}
+                  </span>
+                  {/* Show tx hash prefix for successfully processed items */}
+                  {item.status === "success" && item.txHash && (
+                    <span className="text-[11px] text-zinc-500 font-mono block truncate">
+                      {item.txHash.slice(0, 12)}…
+                    </span>
+                  )}
+                  {/* Show error message for failed items */}
+                  {item.status === "failed" && item.error && (
+                    <span className="text-[11px] text-destructive block truncate">
+                      {item.error}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] text-zinc-500 shrink-0">
                   {statusLabel(item.status)}
                 </span>
