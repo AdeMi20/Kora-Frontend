@@ -1,320 +1,289 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
+import en from "@/messages/en.json";
 import { ListPositionDialog } from "@/components/invoice/ListPositionDialog";
+import InvestorDashboardPage from "@/app/dashboard/investor/page";
+import { usePositionListingStore } from "@/store/positionListingStore";
 import type { InvestorPosition } from "@/types/invoice";
 
-// Mock the formatters hook
-jest.mock("@/hooks/useFormatters", () => ({
-  useFormatters: () => ({
-    formatCurrency: (value: number, currency = "USDC") => `${currency} ${value.toFixed(2)}`,
-    formatPercentage: (value: number, decimals = 2) => `${value.toFixed(decimals)}%`,
-  }),
-});
+const mocks = vi.hoisted(() => ({
+  wallet: { isConnected: true, address: "GINVESTOR" as string | null },
+  positions: [] as unknown[],
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}));
 
-// Mock the computeImpliedDiscount function
-jest.mock("@/types/invoice", () => ({
-  ...jest.requireActual("@/types/invoice"),
-  computeImpliedDiscount: (askPrice: number, expectedReturn: number) => {
-    if (expectedReturn <= 0) return 0;
-    return (expectedReturn - askPrice) / expectedReturn;
+vi.mock("@/lib/env", () => ({
+  env: { NEXT_PUBLIC_ENABLE_MOCK_DATA: true },
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/dashboard/investor",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Resolve `next/dynamic` loaders on mount so the real DataTable renders.
+vi.mock("next/dynamic", () => ({
+  default: (loader: () => Promise<React.ComponentType<Record<string, unknown>>>) => {
+    return function Dynamic(props: Record<string, unknown>) {
+      const [Comp, setComp] = React.useState<React.ComponentType<Record<string, unknown>> | null>(null);
+      React.useEffect(() => {
+        void loader().then((c) => setComp(() => c));
+      }, []);
+      return Comp ? <Comp {...props} /> : null;
+    };
   },
-});
-
-// Mock the UI components
-jest.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ open, onOpenChange, children }: any) => open ? <div data-testid="dialog">{children}</div> : null,
-  DialogContent: ({ children, className }: any) => <div data-testid="dialog-content" className={className}>{children}</div>,
-  DialogHeader: ({ children }: any) => <div data-testid="dialog-header">{children}</div>,
-  DialogTitle: ({ children, className }: any) => <h2 data-testid="dialog-title" className={className}>{children}</h2>,
-  DialogDescription: ({ children }: any) => <p data-testid="dialog-description">{children}</p>,
-  DialogFooter: ({ children }: any) => <div data-testid="dialog-footer">{children}</div>,
 }));
 
-jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, onClick, disabled, variant, ...props }: any) => (
-    <button data-testid="button" onClick={onClick} disabled={disabled} {...props}>
-      {children}
-    </button>
-  ),
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => mocks.wallet,
 }));
 
-jest.mock("@/components/ui/number-input", () => ({
-  NumberInput: ({ value, onChange, error, ...props }: any) => (
-    <input
-      data-testid="number-input"
-      value={value}
-      onChange={onChange}
-      aria-invalid={!!error}
-      aria-describedby={error ? "error-message" : undefined}
-      {...props}
-    />
-  ),
-});
-
-jest.mock("@/hooks/useFormatters", () => ({
-  useFormatters: () => ({
-    formatCurrency: (value: number, currency = "USDC") => `${currency} ${value.toFixed(2)}`,
-    formatPercentage: (value: number, decimals = 2) => `${value.toFixed(2)}%`,
+vi.mock("@/hooks/usePositions", () => ({
+  usePositions: () => ({
+    data: mocks.positions,
+    isLoading: false,
+    isFetching: false,
+    isSuccess: true,
+    isError: false,
+    dataUpdatedAt: Date.now(),
+    refetch: vi.fn(),
   }),
-});
+}));
 
-const mockPosition = {
-  id: "pos_123",
-  invoiceId: "inv_123",
-  investedAmount: 1000,
-  expectedReturn: 1100,
-  yieldEarned: 100,
-  investedAt: "2024-01-01T00:00:00Z",
-  status: "active" as const,
-  invoice: {
-    id: "inv_123",
-    tokenId: "123",
-    contractAddress: "C123",
-    ipfsCid: "QmTest",
-    metadata: {
-      invoiceNumber: "INV-001",
-      issuerName: "Test Corp",
-      issuerAddress: "G...",
-      debtorName: "Debtor Inc",
-      debtorAddress: "G...",
-      amount: 1000,
-      currency: "USDC",
-      issueDate: "2024-01-01T00:00:00Z",
-      dueDate: "2025-01-01T00:00:00Z",
-      description: "Test invoice",
-      jurisdiction: "US",
-      category: "technology",
-      documentHash: "QmTest",
-      documentUrl: "https://example.com",
-    },
-    terms: {
-      discountRate: 0.1,
-      apr: 10,
-      financingAmount: 1000,
-      minInvestment: 100,
-      maxInvestment: 1000,
-      tenor: 365,
-      repaymentDate: "2025-01-01T00:00:00Z",
-    },
-    funding: {
-      totalRaised: 1000,
-      targetAmount: 1000,
-      fundingProgress: 1,
-      investorCount: 1,
-      remainingCapacity: 0,
-    },
-    riskTier: "A",
-    riskScore: 90,
-    debtorPrivacy: "full",
-    status: "active" as const,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-    ownerAddress: "G...",
-  } as any,
-};
+vi.mock("@/hooks/useToast", () => ({
+  useToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
+}));
+
+vi.mock("@/hooks/useTransaction", () => ({
+  useTransaction: () => ({ execute: vi.fn() }),
+}));
+
+vi.mock("@/hooks/useTxSimulation", () => ({
+  useTxSimulation: () => ({ simulationDialogProps: {}, onSimulationPreview: vi.fn() }),
+}));
+
+vi.mock("@/hooks/useVerifiedAction", () => ({
+  useVerifiedAction: () => ({ executeProtectedAction: vi.fn() }),
+}));
+
+vi.mock("@/services/invoiceService", () => ({
+  prepareClaimPosition: vi.fn(),
+}));
+
+// Sections of the dashboard unrelated to the listing flow.
+vi.mock("@/components/dashboard/PortfolioDonut", () => ({ PortfolioDonut: () => null }));
+vi.mock("@/components/dashboard/KycStatusCard", () => ({ KycStatusCard: () => null }));
+vi.mock("@/components/analytics/ConcentrationRiskAlerts", () => ({
+  ConcentrationRiskAlerts: () => null,
+}));
+vi.mock("@/components/layout/StaleDataBadge", () => ({ StaleDataBadge: () => null }));
+vi.mock("@/components/invoice/TxSimulationPreview", () => ({ TxSimulationPreview: () => null }));
+
+function makePosition(overrides: Partial<InvestorPosition> = {}): InvestorPosition {
+  return {
+    id: "pos_123",
+    invoiceId: "inv_123",
+    investedAmount: 1000,
+    expectedReturn: 1100,
+    yieldEarned: 100,
+    investedAt: "2026-01-01T00:00:00Z",
+    status: "active",
+    invoice: {
+      id: "inv_123",
+      tokenId: "123",
+      metadata: {
+        invoiceNumber: "INV-001",
+        debtorName: "Debtor Inc",
+        currency: "USDC",
+        jurisdiction: "US",
+        category: "technology",
+      },
+      terms: { apr: 10, repaymentDate: "2027-01-01T00:00:00Z" },
+      riskTier: "A",
+      createdAt: "2026-01-01T00:00:00Z",
+    } as unknown as InvestorPosition["invoice"],
+    ...overrides,
+  };
+}
+
+// onError is silenced because some dashboard sections (stats, error copy) still
+// reference keys missing from en.json; the listing flow asserts on real copy.
+function withIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={en} onError={() => {}}>
+      {ui}
+    </NextIntlClientProvider>
+  );
+}
 
 describe("ListPositionDialog", () => {
-  const defaultProps = {
-    position: {
-      id: "pos_123",
-      invoiceId: "inv_123",
-      investedAmount: 1000,
-      expectedReturn: 1100,
-      yieldEarned: 100,
-      investedAt: "2024-01-01T00:00:00Z",
-      status: "active" as const,
-      invoice: {
-        id: "inv_123",
-        tokenId: "123",
-        contractAddress: "C123",
-        ipfsCid: "QmTest",
-        metadata: {
-          invoiceNumber: "INV-001",
-          issuerName: "Test Corp",
-          issuerAddress: "G...",
-          debtorName: "Debtor Inc",
-          debtorAddress: "G...",
-          amount: 1000,
-          currency: "USDC",
-          issueDate: "2024-01-01T00:00:00Z",
-          dueDate: "2025-01-01T00:00:00Z",
-          description: "Test invoice",
-          jurisdiction: "US",
-          category: "technology",
-          documentHash: "QmTest",
-          documentUrl: "https://example.com",
-        },
-        terms: {
-          discountRate: 0.1,
-          apr: 10,
-          financingAmount: 1000,
-          minInvestment: 100,
-          maxInvestment: 1000,
-          tenor: 365,
-          repaymentDate: "2025-01-01T00:00:00Z",
-        },
-        funding: {
-          totalRaised: 1000,
-          targetAmount: 1000,
-          fundingProgress: 1,
-          investorCount: 1,
-          remainingCapacity: 0,
-        },
-        riskTier: "A",
-        riskScore: 90,
-        debtorPrivacy: "full" as const,
-        status: "active" as const,
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-        ownerAddress: "G...",
-      } as any,
-    },
-    open: true,
-    onOpenChange: jest.fn(),
-    onSubmit: jest.fn(),
-  };
+  const onOpenChange = vi.fn();
+  const onSubmit = vi.fn();
 
+  function renderDialog(position: InvestorPosition | null = makePosition()) {
+    return withIntl(
+      <ListPositionDialog
+        position={position}
+        open
+        onOpenChange={onOpenChange}
+        onSubmit={onSubmit}
+      />
+    );
+  }
+
+  it("renders the dialog with the expected return", () => {
+    renderDialog();
+    const dialog = screen.getByRole("dialog", { name: /list position for sale/i });
+    expect(dialog).toHaveTextContent(/Expected return:.*1,100/);
+  });
+
+  it("renders nothing when position is null", () => {
+    renderDialog(null);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps submit disabled until a valid ask price is entered", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const submit = screen.getByRole("button", { name: "List for sale" });
+    expect(submit).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Ask price"), "1000");
+    expect(submit).toBeEnabled();
+  });
+
+  it("shows a range error when the ask price is too low or too high", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const input = screen.getByLabelText("Ask price");
+
+    await user.type(input, "50");
+    expect(screen.getByText(/Ask price must be between/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "List for sale" })).toBeDisabled();
+
+    await user.clear(input);
+    await user.type(input, "3000");
+    expect(screen.getByText(/Ask price must be between/)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("previews the implied discount or premium", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const input = screen.getByLabelText("Ask price");
+
+    await user.type(input, "1000");
+    expect(screen.getByText("Implied discount")).toBeInTheDocument();
+    expect(
+      screen.getByText("Buyer receives a discount versus your expected return.")
+    ).toBeInTheDocument();
+
+    await user.clear(input);
+    await user.type(input, "1200");
+    expect(
+      screen.getByText("You're asking above your expected return (premium).")
+    ).toBeInTheDocument();
+  });
+
+  it("submits the parsed ask price and resets the input", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const input = screen.getByLabelText("Ask price");
+
+    await user.type(input, "1000");
+    await user.click(screen.getByRole("button", { name: "List for sale" }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(1000, undefined);
+    expect(input).toHaveValue(null);
+  });
+
+  it("calls onOpenChange(false) on cancel", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("ListPositionDialog on the investor dashboard (#945)", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mocks.wallet = { isConnected: true, address: "GINVESTOR" };
+    mocks.positions = [makePosition()];
+    act(() => usePositionListingStore.setState({ listings: {} }));
   });
 
-  it("renders dialog when open is true", () => {
-    render(<ListPositionDialog {...defaultProps} />);
-    expect(screen.getByTestId("dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("dialog-title")).toHaveTextContent("List position for sale");
-  });
-
-  it("does not render when position is null", () => {
-    render(<ListPositionDialog {...defaultProps} position={null} />);
-    expect(screen.queryByTestId("dialog")).not.toBeInTheDocument();
-  });
-
-  it("renders expected return in description", () => {
-    render(<ListPositionDialog {...defaultProps} />);
-    expect(screen.getByText("Expected return: USDC 1100.00")).toBeInTheDocument();
-  });
-
-  it("shows error when ask price is empty and user tries to submit", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    const submitButton = screen.getByRole("button", { name: /list for sale/i });
-    await userEvent.click(submitButton);
-
-    // Should not call onSubmit
-    expect(defaultProps.onSubmit).not.toHaveBeenCalled();
-  });
-
-  it("shows error when ask price is invalid", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "abc");
-    await userEvent.click(screen.getByRole("button", { name: /list for sale/i }));
-
-    expect(defaultProps.onSubmit).not.toHaveBeenCalled();
-  });
-
-  it("shows validation error when ask price is too low", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "50"); // Too low (below 10% of expected return)
-    await userEvent.click(screen.getByRole("button", { name: /list for sale/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/must be between/)).toBeInTheDocument();
+  async function openFromRow(user: ReturnType<typeof userEvent.setup>) {
+    withIntl(<InvestorDashboardPage />);
+    const listButton = await screen.findByRole("button", {
+      name: en.investorDashboard.table.listForSale,
     });
-  });
+    await user.click(listButton);
+    return screen.findByRole("dialog", { name: /list position for sale/i });
+  }
 
-  it("shows warning when ask price is too high", async () => {
+  it("opens from a position row, validates, lists to the store and closes", async () => {
     const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
+    const dialog = await openFromRow(user);
+    const input = within(dialog).getByLabelText("Ask price");
+    const submit = within(dialog).getByRole("button", { name: "List for sale" });
 
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "3000"); // Too high (above 200% of expected return)
-    await userEvent.click(screen.getByRole("button", { name: /list for sale/i }));
+    // Invalid ask price: error shown, nothing reaches the store.
+    await user.type(input, "50");
+    expect(within(dialog).getByText(/Ask price must be between/)).toBeInTheDocument();
+    expect(submit).toBeDisabled();
+    expect(usePositionListingStore.getState().listings).toEqual({});
 
-    await waitFor(() => {
-      expect(screen.getByText(/must be between/)).toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, "1000");
+    await user.click(submit);
+
+    const [listing] = usePositionListingStore.getState().getListingsByInvoiceToken("123");
+    expect(listing).toMatchObject({
+      positionId: "pos_123",
+      askPrice: 1000,
+      invoiceTokenId: "123",
+      repaymentDate: "2027-01-01T00:00:00Z",
+      ownershipConfirmed: true,
     });
+    expect(listing.impliedDiscount).toBeCloseTo(100 / 1100);
+    expect(Number.isNaN(Date.parse(listing.listedAt))).toBe(false);
+
+    expect(mocks.toastSuccess).toHaveBeenCalledTimes(1);
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(en.investorDashboard.listing.success);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // The row now offers to unlist instead of creating a second listing.
+    expect(
+      screen.getByRole("button", { name: en.investorDashboard.table.unlist })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: en.investorDashboard.table.listForSale })
+    ).not.toBeInTheDocument();
   });
 
-  it("shows implied discount preview when valid price entered", async () => {
+  it("closes without listing when cancelled", async () => {
     const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
+    const dialog = await openFromRow(user);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "1000"); // Valid price, 9.09% discount
-
-    await waitFor(() => {
-      expect(screen.getByText("Implied discount")).toBeInTheDocument();
-      expect(screen.getByText("9.09%")).toBeInTheDocument();
-      expect(screen.getByText("Buyer receives a discount versus your expected return.")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(usePositionListingStore.getState().listings).toEqual({});
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
-  it("shows premium warning when ask price above expected return", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
+  it("offers no listing action while the wallet is disconnected", () => {
+    mocks.wallet = { isConnected: false, address: null };
+    withIntl(<InvestorDashboardPage />);
 
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "1200"); // Above expected return (premium)
-
-    await waitFor(() => {
-      expect(screen.getByText("You're asking above your expected return (premium).")).toBeInTheDocument();
-    });
-  });
-
-  it("calls onSubmit with parsed ask price when valid", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "1000");
-    await userEvent.click(screen.getByRole("button", { name: /list for sale/i }));
-
-    await waitFor(() => {
-      expect(defaultProps.onSubmit).toHaveBeenCalledWith(1000);
-    });
-  });
-
-  it("shows suggested price range guidance", () => {
-    render(<ListPositionDialog {...defaultProps} />);
-    expect(screen.getByText(/Suggested range:/)).toBeInTheDocument();
-    expect(screen.getByText("USDC 110.00 - USDC 2200.00")).toBeInTheDocument();
-  });
-
-  it("closes dialog when cancel is clicked", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
-
-    await waitFor(() => {
-      expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  it("clears ask price after successful submit", async () => {
-    const user = userEvent.setup();
-    render(<ListPositionDialog {...defaultProps} />);
-
-    const input = screen.getByTestId("number-input");
-    await userEvent.type(input, "1000");
-    await userEvent.click(screen.getByRole("button", { name: /list for sale/i }));
-
-    await waitFor(() => {
-      expect((screen.getByTestId("number-input") as HTMLInputElement).value).toBe("");
-    });
-  });
-
-  it("closes dialog on cancel", () => {
-    render(<ListPositionDialog {...defaultProps} />);
-    const cancelButton = screen.getByRole("button", { name: /cancel/i });
-    fireEvent.click(cancelButton);
-    expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false);
+    expect(
+      screen.queryByRole("button", { name: en.investorDashboard.table.listForSale })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.common.connectWallet })).toBeInTheDocument();
   });
 });

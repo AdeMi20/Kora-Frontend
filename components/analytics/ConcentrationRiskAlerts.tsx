@@ -12,6 +12,7 @@
  */
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, X } from "lucide-react";
 
@@ -21,6 +22,7 @@ import {
   filterActiveAlerts,
   type ConcentrationPosition,
 } from "@/lib/concentrationRisk";
+import { marketplacePathForConcentration } from "@/lib/concentrationMarketplaceLink";
 import { useSettingsStore } from "@/store/settingsStore";
 import { Button } from "@/components/ui/button";
 
@@ -88,6 +90,14 @@ export function ConcentrationRiskAlerts({
               </p>
 
               <div className="mt-2 flex flex-wrap gap-2">
+                <Button asChild size="sm" className="h-7 text-xs">
+                  <Link
+                    href={marketplacePathForConcentration(alert)}
+                    data-testid={`concentration-cta-${alert.key}`}
+                  >
+                    {t("diversifyCta")}
+                  </Link>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

@@ -529,7 +529,12 @@
       "risk": "Risk",
       "dueDate": "Due Date",
       "claim": "Claim",
-      "view": "View →"
+      "view": "View →",
+      "listForSale": "List for Sale",
+      "unlist": "Unlist"
+    },
+    "listing": {
+      "success": "Position listed for sale"
     },
     "activePositions": "Active Positions",
     "allocationRisk": "Allocation by Risk Tier",
@@ -1218,6 +1223,7 @@
     "dismiss": "Dismiss",
     "snoozeDay": "Snooze 1 day",
     "snoozeWeek": "Snooze 1 week",
+    "diversifyCta": "Find diversification options",
     "settings": "Adjust thresholds",
     "critical": "Critical",
     "warning": "Warning"
@@ -1378,5 +1384,41 @@
     "legendItemAria": "Browse marketplace filtered by {name}: {percent}",
     "filteringBy": "Filtering marketplace by <strong>{dimension}</strong>: {value}",
     "clearFilter": "Clear filter"
+  },
+  "kyc": {
+    "title": "Synaps KYC Verification",
+    "description": "Verify your identity with Synaps to unlock higher investment limits.",
+    "intro": {
+      "body": "To comply with global regulatory standards, you must verify your identity. The verification process is handled securely by Synaps and takes about 2 minutes.",
+      "requirementsTitle": "What you will need:",
+      "requirementId": "Government-issued ID or Passport",
+      "requirementSelfie": "Clear selfie photo",
+      "requirementAddress": "Proof of address (for higher tier limits)",
+      "start": "Start Verification Flow"
+    },
+    "upload": {
+      "docTypeLabel": "Select Document Type:",
+      "passport": "Passport",
+      "idCard": "National ID Card",
+      "dropzone": "Drag and drop your document here, or click to browse",
+      "dropzoneHint": "Accepts PDF, JPG, or PNG up to 10MB",
+      "back": "Back",
+      "verifySuccess": "Verify (Success)",
+      "verifyFail": "Verify (Fail)"
+    },
+    "verifying": {
+      "title": "Verifying Documents",
+      "body": "Synaps automated checks are analyzing your document and checking compliance databases..."
+    },
+    "success": {
+      "title": "Identity Verified Successfully!",
+      "body": "Thank you! Your KYC status is now verified. Your account investment limits have been upgraded.",
+      "continue": "Continue"
+    },
+    "failed": {
+      "title": "Verification Failed",
+      "body": "Synaps was unable to verify your document automatically. Make sure the document image is clear, uncropped, and all details are visible.",
+      "retry": "Try Again"
+    }
   }
 }

@@ -23,7 +23,7 @@
  * | Field            | Type                    | Notes                                          |
  * |------------------|-------------------------|------------------------------------------------|
  * | event            | string                  | Event name (see above)                        |
- * | source           | "deeplink" \| "organic" | Whether the visit was driven by a shared URL  |
+ * | source           | "deeplink" \| "organic" \| "concentration_cta" | Shared URL, organic, or a concentration-alert CTA |
  * | filter_count     | number                  | Active filter count at event time             |
  * | has_invoice_id   | boolean                 | URL contained an invoice/token ID             |
  * | has_compare      | boolean                 | URL contained a compare param                 |
@@ -43,8 +43,11 @@ export type MarketplaceEventName =
 
 export interface MarketplaceAnalyticsPayload {
   event: MarketplaceEventName;
-  /** Whether this visit originated from a shared / deep-linked URL. */
-  source: "deeplink" | "organic";
+  /**
+   * Whether this visit originated from a shared / deep-linked URL, or from a
+   * concentration-risk alert CTA (`?source=concentration_cta`, #944).
+   */
+  source: "deeplink" | "organic" | "concentration_cta";
   /** Number of active filters at the time of the event. */
   filter_count: number;
   /** True when the URL contained an invoice_id / token_id parameter. */
@@ -110,6 +113,11 @@ export function isDeepLink(params: URLSearchParams): boolean {
   return false;
 }
 
+function landingSource(params: URLSearchParams): MarketplaceAnalyticsPayload["source"] {
+  if (params.get("source") === "concentration_cta") return "concentration_cta";
+  return isDeepLink(params) ? "deeplink" : "organic";
+}
+
 // ─── Transport ────────────────────────────────────────────────────────────────
 
 const LOCAL_STORAGE_KEY = "kora-marketplace-analytics";
@@ -169,7 +177,7 @@ function buildPayload(
 ): MarketplaceAnalyticsPayload {
   return {
     event,
-    source: isDeepLink(params) ? "deeplink" : "organic",
+    source: landingSource(params),
     filter_count: filterCount,
     has_invoice_id: params.has("invoice_id"),
     has_compare: params.has("compare"),
@@ -188,7 +196,7 @@ export function trackMarketplaceLand(
   filterCount: number,
   sortBy?: string | null
 ): void {
-  if (!isDeepLink(params)) return;
+  if (landingSource(params) === "organic") return;
   dispatch(buildPayload("marketplace_land", params, filterCount, sortBy));
 }
 
