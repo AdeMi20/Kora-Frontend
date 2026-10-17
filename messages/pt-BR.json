@@ -497,20 +497,34 @@
     "browseMarketplace": "Explorar Mercado",
     "connectTitle": "Conecte sua carteira",
     "connectDesc": "Conecte para visualizar sua carteira de investimentos",
-    "claim": {
-      "successMessage": "Reivindicação enviada",
-      "verificationRequiredTitle": "Verificação necessária",
-      "verificationRequiredDesc": "Verifique a propriedade da carteira para reivindicar seu rendimento.",
-      "failedTitle": "Falha ao reivindicar"
+    "connectWallet": {
+      "title": "Conecte sua carteira",
+      "description": "Conecte para visualizar sua carteira de investimentos e começar a ganhar rendimentos."
+    },
+    "error": {
+      "title": "Falha ao carregar carteira",
+      "description": "Não foi possível buscar suas posições. Verifique sua conexão e tente novamente.",
+      "timeout": "O carregamento da sua carteira está demorando mais do que o habitual. Por favor, tente novamente.",
+      "retry": "Tentar novamente"
     },
     "stats": {
       "portfolioValue": "Valor da Carteira",
       "expectedYield": "Rendimento Esperado",
+      "expectedReturn": "Retorno Esperado",
+      "yieldEarned": "Rendimento Obtido",
       "activePositions": "Posições Ativas",
       "avgApr": "APR Médio",
       "activePositionsChange": "{count} posição(ões) ativa(s)",
       "returnChange": "{percent}% de retorno",
       "acrossPositions": "Em todas as posições"
+    },
+    "allocation": {
+      "title": "Alocação da Carteira"
+    },
+    "positions": {
+      "title": "Suas Posições",
+      "count": "{count} posição",
+      "empty": "Nenhuma posição corresponde ao filtro atual."
     },
     "table": {
       "invoice": "Fatura",
@@ -533,7 +547,8 @@
     "allocationRisk": "Alocação por Nível de Risco",
     "allocationJurisdiction": "Alocação por Jurisdição",
     "empty": {
-      "title": "Nenhuma posição",
+      "title": "Nenhuma posição ainda",
+      "description": "Financie faturas no mercado para começar a construir sua carteira.",
       "message": "Financie faturas no mercado para construir sua carteira."
     },
     "fundTestnet": "Financiar Conta Testnet"
@@ -954,9 +969,49 @@
     "connectCta": "Conectar carteira",
     "navLabel": "Configurações",
     "openFull": "Abrir configurações completas",
-    "error": {
-      "title": "Não foi possível carregar as configurações",
-      "description": "Suas preferências salvas não foram alteradas. Tente novamente para recarregar suas configurações de notificação e do tour, ou volte para o início."
+    "notifications": {
+      "sectionTitle": "Preferências de Notificação",
+      "sectionDesc": "Controle quais alertas aparecem durante seu fluxo de trabalho.",
+      "maturityReminder": {
+        "label": "Lembretes de Vencimento",
+        "description": "Lembrar antes da data de vencimento da fatura."
+      },
+      "fundingAlerts": {
+        "label": "Alertas de Financiamento",
+        "description": "Notificar quando sua fatura atingir marcos de financiamento."
+      },
+      "repaymentAlerts": {
+        "label": "Alertas de Reembolso",
+        "description": "Notificar quando o reembolso estiver próximo ou concluído."
+      },
+      "reminderTiming": {
+        "label": "Momento do lembrete",
+        "description": "Escolha quando alertar antes da data de vencimento.",
+        "day1": "1 dia antes do vencimento",
+        "day3": "3 dias antes do vencimento",
+        "day7": "7 dias antes do vencimento"
+      },
+      "resetDefaults": "Restaurar padrões",
+      "toggleAriaLabel": "Alternar {label}",
+      "tourSection": {
+        "title": "Tour de Integração"
+      },
+      "shortcutsSection": {
+        "title": "Atalhos de Teclado",
+        "description": "Ative atalhos de teclado globais para navegação mais rápida.",
+        "enableLabel": "Ativar atalhos",
+        "enableDesc": "Pressione {key} para ver todos os atalhos.",
+        "toggleAriaLabel": "Alternar atalhos de teclado"
+      },
+      "diagnosticsSection": {
+        "title": "Diagnósticos de Suporte",
+        "description": "Exporte um instantâneo redatado de sessão de carteira com estado de rede e feature flags.",
+        "exportButton": "Exportar JSON de diagnósticos",
+        "importButton": "Importar diagnósticos",
+        "exportNote": "A exportação inclui provedor, rede, flags de sessão e feature flags. Nenhum segredo, frase-semente, JWT ou endereço completo é incluído.",
+        "importSuccess": "Diagnósticos importados para depuração local.",
+        "importFailed": "Falha ao importar diagnósticos."
+      }
     }
   },
   "shortcuts": {

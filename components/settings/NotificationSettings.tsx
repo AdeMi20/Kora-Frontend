@@ -9,28 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/useWallet";
 import { env } from "@/lib/env";
 
-const NOTIFICATION_ITEMS: Array<{
-  key: "maturityReminder" | "fundingAlerts" | "repaymentAlerts";
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "maturityReminder",
-    label: "Maturity Reminders",
-    description: "Remind you before invoice maturity date.",
-  },
-  {
-    key: "fundingAlerts",
-    label: "Funding Alerts",
-    description: "Notify when your invoice reaches funding milestones.",
-  },
-  {
-    key: "repaymentAlerts",
-    label: "Repayment Alerts",
-    description: "Notify when repayment is due or completed.",
-  },
-];
-
 function Toggle({
   checked,
   onChange,
@@ -63,28 +41,37 @@ function Toggle({
 }
 
 export function NotificationSettings() {
-  const t = useTranslations("onboarding");
-  const {
-    notifications,
-    setNotifications,
-    resetNotifications,
-    tour,
-    setTourSettings,
-    restartTour,
-    setActiveWallet,
-  } = useSettingsStore();
+  const t = useTranslations("settings.notifications");
+  const tOnboarding = useTranslations("onboarding");
+  const { notifications, setNotifications, resetNotifications, tour, setTourSettings, restartTour } = useSettingsStore();
   const shortcutsEnabled = useUIStore((s) => s.shortcutsEnabled);
   const setShortcutsEnabled = useUIStore((s) => s.setShortcutsEnabled);
   const { address, exportWalletDiagnostics, importWalletDiagnostics } = useWallet();
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Notification preferences are scoped per wallet; bind the store's active
-  // wallet to the connected one so this surface and the wallet dropdown read
-  // and write the same record.
-  useEffect(() => {
-    setActiveWallet(address ?? null);
-  }, [address, setActiveWallet]);
+  // Items array built at render time from translated strings — no hardcoded English
+  const NOTIFICATION_ITEMS: Array<{
+    key: "maturityReminder" | "fundingAlerts" | "repaymentAlerts";
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: "maturityReminder",
+      label: t("maturityReminder.label"),
+      description: t("maturityReminder.description"),
+    },
+    {
+      key: "fundingAlerts",
+      label: t("fundingAlerts.label"),
+      description: t("fundingAlerts.description"),
+    },
+    {
+      key: "repaymentAlerts",
+      label: t("repaymentAlerts.label"),
+      description: t("repaymentAlerts.description"),
+    },
+  ];
 
   const handleExportDiagnostics = () => {
     const payload = exportWalletDiagnostics();
@@ -107,10 +94,10 @@ export function NotificationSettings() {
     try {
       const raw = await file.text();
       importWalletDiagnostics(raw);
-      setImportStatus("Diagnostics imported for local debug.");
+      setImportStatus(t("diagnosticsSection.importSuccess"));
     } catch (error) {
       setImportStatus(
-        error instanceof Error ? error.message : "Diagnostics import failed."
+        error instanceof Error ? error.message : t("diagnosticsSection.importFailed")
       );
     } finally {
       event.target.value = "";
@@ -119,9 +106,10 @@ export function NotificationSettings() {
 
   return (
     <div className="space-y-5">
+      {/* ── Notification Preferences ────────────────────────────────────── */}
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-foreground">Notification Preferences</h3>
-        <p className="text-sm text-muted-foreground">Control which in-app alerts appear during your workflow.</p>
+        <h3 className="text-base font-semibold text-foreground">{t("sectionTitle")}</h3>
+        <p className="text-sm text-muted-foreground">{t("sectionDesc")}</p>
       </div>
 
       <div className="space-y-3">
@@ -134,17 +122,18 @@ export function NotificationSettings() {
             <Toggle
               checked={notifications[item.key]}
               onChange={(next) => setNotifications({ [item.key]: next })}
-              ariaLabel={`Toggle ${item.label}`}
+              ariaLabel={t("toggleAriaLabel", { label: item.label })}
             />
           </div>
         ))}
       </div>
 
+      {/* ── Reminder timing ─────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card p-3">
         <label htmlFor="maturity-reminder-days" className="block text-sm font-medium text-foreground">
-          Reminder timing
+          {t("reminderTiming.label")}
         </label>
-        <p className="mt-0.5 text-xs text-muted-foreground">Choose when to alert before maturity date.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t("reminderTiming.description")}</p>
         <select
           id="maturity-reminder-days"
           value={notifications.maturityReminderDays}
@@ -152,9 +141,9 @@ export function NotificationSettings() {
           className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
           disabled={!notifications.maturityReminder}
         >
-          <option value={1}>1 day before maturity</option>
-          <option value={3}>3 days before maturity</option>
-          <option value={7}>7 days before maturity</option>
+          <option value={1}>{t("reminderTiming.day1")}</option>
+          <option value={3}>{t("reminderTiming.day3")}</option>
+          <option value={7}>{t("reminderTiming.day7")}</option>
         </select>
       </div>
 
@@ -165,20 +154,20 @@ export function NotificationSettings() {
         leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
         onClick={resetNotifications}
       >
-        Reset to defaults
+        {t("resetDefaults")}
       </Button>
 
       {/* ── Onboarding Tour Settings ────────────────────────────────────── */}
       <div className="space-y-1 pt-2">
-        <h3 className="text-base font-semibold text-foreground">Onboarding Tour</h3>
+        <h3 className="text-base font-semibold text-foreground">{t("tourSection.title")}</h3>
         <p className="text-sm text-muted-foreground">
-          {t("restartTourDesc")}
+          {tOnboarding("restartTourDesc")}
         </p>
       </div>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
         <div>
           <label htmlFor="tour-persona-select" className="block text-xs font-medium text-foreground">
-            {t("activePersona")}
+            {tOnboarding("activePersona")}
           </label>
           <select
             id="tour-persona-select"
@@ -186,15 +175,19 @@ export function NotificationSettings() {
             onChange={(e) => setTourSettings({ persona: e.target.value as Persona })}
             className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground"
           >
-            <option value="investor">{t("personaInvestor")}</option>
-            <option value="sme">{t("personaSme")}</option>
+            <option value="investor">{tOnboarding("personaInvestor")}</option>
+            <option value="sme">{tOnboarding("personaSme")}</option>
           </select>
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
           <span>Status:</span>
           <span className="font-medium text-foreground">
-            {tour.completed ? t("tourCompleted") : tour.skipped ? t("tourSkipped") : `Step ${(tour.stepIndex ?? 0) + 1}`}
+            {tour.completed
+              ? tOnboarding("tourCompleted")
+              : tour.skipped
+                ? tOnboarding("tourSkipped")
+                : `Step ${(tour.stepIndex ?? 0) + 1}`}
           </span>
         </div>
 
@@ -205,39 +198,36 @@ export function NotificationSettings() {
           leftIcon={<Compass className="h-3.5 w-3.5" />}
           onClick={() => restartTour(tour.persona)}
         >
-          {t("restartTour")}
+          {tOnboarding("restartTour")}
         </Button>
       </div>
 
       {/* ── Keyboard shortcuts toggle ──────────────────────────────────────── */}
       <div className="space-y-1 pt-2">
-        <h3 className="text-base font-semibold text-foreground">Keyboard Shortcuts</h3>
-        <p className="text-sm text-muted-foreground">
-          Enable global keyboard shortcuts for faster navigation.
-        </p>
+        <h3 className="text-base font-semibold text-foreground">{t("shortcutsSection.title")}</h3>
+        <p className="text-sm text-muted-foreground">{t("shortcutsSection.description")}</p>
       </div>
       <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-2">
           <Keyboard className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <div>
-            <p className="text-sm font-medium text-foreground">Enable shortcuts</p>
+            <p className="text-sm font-medium text-foreground">{t("shortcutsSection.enableLabel")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Press <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">?</kbd> to view all shortcuts.
+              {t("shortcutsSection.enableDesc", { key: "?" })}
             </p>
           </div>
         </div>
         <Toggle
           checked={shortcutsEnabled}
           onChange={setShortcutsEnabled}
-          ariaLabel="Toggle keyboard shortcuts"
+          ariaLabel={t("shortcutsSection.toggleAriaLabel")}
         />
       </div>
 
+      {/* ── Support Diagnostics ──────────────────────────────────────────── */}
       <div className="space-y-2 pt-2">
-        <h3 className="text-base font-semibold text-foreground">Support Diagnostics</h3>
-        <p className="text-sm text-muted-foreground">
-          Export a redacted wallet session snapshot with network and feature-flag state.
-        </p>
+        <h3 className="text-base font-semibold text-foreground">{t("diagnosticsSection.title")}</h3>
+        <p className="text-sm text-muted-foreground">{t("diagnosticsSection.description")}</p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             variant="outline"
@@ -246,7 +236,7 @@ export function NotificationSettings() {
             leftIcon={<Download className="h-3.5 w-3.5" />}
             onClick={handleExportDiagnostics}
           >
-            Export diagnostics JSON
+            {t("diagnosticsSection.exportButton")}
           </Button>
           {env.NEXT_PUBLIC_ENABLE_DEVTOOLS && (
             <>
@@ -264,14 +254,12 @@ export function NotificationSettings() {
                 leftIcon={<Upload className="h-3.5 w-3.5" />}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Import diagnostics
+                {t("diagnosticsSection.importButton")}
               </Button>
             </>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          Export includes provider, network, kit session flags, and feature flags. No secrets, seed phrases, JWTs, or full addresses are included.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("diagnosticsSection.exportNote")}</p>
         {importStatus && (
           <p className="text-xs text-muted-foreground" aria-live="polite">
             {importStatus}
@@ -281,4 +269,3 @@ export function NotificationSettings() {
     </div>
   );
 }
-

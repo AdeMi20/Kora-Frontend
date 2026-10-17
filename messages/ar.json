@@ -497,20 +497,34 @@
     "browseMarketplace": "تصفح السوق",
     "connectTitle": "ربط محفظتك",
     "connectDesc": "ربط المحفظة لعرض محفظة استثماراتك",
-    "claim": {
-      "successMessage": "تم تقديم الطلب",
-      "verificationRequiredTitle": "التحقق مطلوب",
-      "verificationRequiredDesc": "تحقق من ملكية المحفظة للمطالبة بعائدك.",
-      "failedTitle": "فشل الطلب"
+    "connectWallet": {
+      "title": "ربط محفظتك",
+      "description": "ربط المحفظة لعرض محفظة استثماراتك والبدء في كسب العوائد."
+    },
+    "error": {
+      "title": "فشل تحميل المحفظة",
+      "description": "تعذر جلب مراكزك. تحقق من اتصالك وحاول مجدداً.",
+      "timeout": "يستغرق تحميل محفظتك وقتاً أطول من المعتاد. يرجى إعادة المحاولة.",
+      "retry": "إعادة المحاولة"
     },
     "stats": {
       "portfolioValue": "قيمة المحفظة",
       "expectedYield": "العائد المتوقع",
+      "expectedReturn": "العائد المتوقع",
+      "yieldEarned": "العائد المكتسب",
       "activePositions": "المراكز النشطة",
       "avgApr": "متوسط APR",
       "activePositionsChange": "{count} مركز نشط",
       "returnChange": "عائد {percent}%",
       "acrossPositions": "عبر كل المراكز"
+    },
+    "allocation": {
+      "title": "توزيع المحفظة"
+    },
+    "positions": {
+      "title": "مراكزك",
+      "count": "{count} مركز",
+      "empty": "لا توجد مراكز تطابق الفلتر الحالي."
     },
     "table": {
       "invoice": "الفاتورة",
@@ -533,7 +547,8 @@
     "allocationRisk": "التوزيع حسب مستوى المخاطرة",
     "allocationJurisdiction": "التوزيع حسب الجهة القضائية",
     "empty": {
-      "title": "لا توجد مراكز",
+      "title": "لا توجد مراكز بعد",
+      "description": "موّل الفواتير في السوق لبدء بناء محفظتك.",
       "message": "موّل الفواتير في السوق لبناء محفظتك."
     },
     "fundTestnet": "تمويل حساب الاختبار"
@@ -954,9 +969,49 @@
     "connectCta": "ربط المحفظة",
     "navLabel": "الإعدادات",
     "openFull": "فتح الإعدادات الكاملة",
-    "error": {
-      "title": "تعذّر تحميل الإعدادات",
-      "description": "لم تتغير تفضيلاتك المحفوظة. حاول مرة أخرى لإعادة تحميل إعدادات الإشعارات والجولة، أو عد إلى الصفحة الرئيسية."
+    "notifications": {
+      "sectionTitle": "تفضيلات الإشعارات",
+      "sectionDesc": "تحكّم في التنبيهات التي تظهر أثناء سير عملك.",
+      "maturityReminder": {
+        "label": "تذكيرات الاستحقاق",
+        "description": "تذكيري قبل تاريخ استحقاق الفاتورة."
+      },
+      "fundingAlerts": {
+        "label": "تنبيهات التمويل",
+        "description": "إشعار عند وصول فاتورتك إلى أهداف التمويل."
+      },
+      "repaymentAlerts": {
+        "label": "تنبيهات السداد",
+        "description": "إشعار عند اقتراب موعد السداد أو اكتماله."
+      },
+      "reminderTiming": {
+        "label": "توقيت التذكير",
+        "description": "اختر متى تريد التنبيه قبل تاريخ الاستحقاق.",
+        "day1": "يوم واحد قبل الاستحقاق",
+        "day3": "٣ أيام قبل الاستحقاق",
+        "day7": "٧ أيام قبل الاستحقاق"
+      },
+      "resetDefaults": "إعادة الضبط إلى الافتراضي",
+      "toggleAriaLabel": "تبديل {label}",
+      "tourSection": {
+        "title": "جولة الإعداد"
+      },
+      "shortcutsSection": {
+        "title": "اختصارات لوحة المفاتيح",
+        "description": "فعّل اختصارات لوحة المفاتيح العالمية للتنقل بشكل أسرع.",
+        "enableLabel": "تفعيل الاختصارات",
+        "enableDesc": "اضغط {key} لعرض كل الاختصارات.",
+        "toggleAriaLabel": "تبديل اختصارات لوحة المفاتيح"
+      },
+      "diagnosticsSection": {
+        "title": "تشخيصات الدعم",
+        "description": "تصدير لقطة معقّمة لجلسة المحفظة مع حالة الشبكة وأعلام الميزات.",
+        "exportButton": "تصدير JSON للتشخيصات",
+        "importButton": "استيراد التشخيصات",
+        "exportNote": "يتضمن التصدير المزوّد والشبكة وأعلام جلسة الحزمة وأعلام الميزات. لا تُضمَّن أسرار أو عبارات بذر أو JWTs أو عناوين كاملة.",
+        "importSuccess": "تم استيراد التشخيصات لأغراض تصحيح الأخطاء المحلية.",
+        "importFailed": "فشل استيراد التشخيصات."
+      }
     }
   },
   "shortcuts": {

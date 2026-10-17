@@ -497,20 +497,34 @@
     "browseMarketplace": "Explorar Mercado",
     "connectTitle": "Conecta tu billetera",
     "connectDesc": "Conéctate para ver tu portafolio de inversiones",
-    "claim": {
-      "successMessage": "Reclamación enviada",
-      "verificationRequiredTitle": "Verificación requerida",
-      "verificationRequiredDesc": "Verifica la propiedad de tu billetera para reclamar tu rendimiento.",
-      "failedTitle": "Error al reclamar"
+    "connectWallet": {
+      "title": "Conecta tu billetera",
+      "description": "Conéctate para ver tu portafolio de inversiones y comenzar a ganar rendimientos."
+    },
+    "error": {
+      "title": "Error al cargar el portafolio",
+      "description": "No pudimos obtener tus posiciones. Verifica tu conexión e inténtalo de nuevo.",
+      "timeout": "Cargar tu portafolio está tardando más de lo habitual. Por favor, reintenta.",
+      "retry": "Reintentar"
     },
     "stats": {
       "portfolioValue": "Valor del Portafolio",
       "expectedYield": "Rendimiento Esperado",
+      "expectedReturn": "Retorno Esperado",
+      "yieldEarned": "Rendimiento Ganado",
       "activePositions": "Posiciones Activas",
       "avgApr": "APR Promedio",
       "activePositionsChange": "{count} posiciones activas",
       "returnChange": "{percent}% de retorno",
       "acrossPositions": "En todas las posiciones"
+    },
+    "allocation": {
+      "title": "Asignación del Portafolio"
+    },
+    "positions": {
+      "title": "Tus Posiciones",
+      "count": "{count} posición",
+      "empty": "Ninguna posición coincide con el filtro actual."
     },
     "table": {
       "invoice": "Factura",
@@ -533,7 +547,8 @@
     "allocationRisk": "Asignación por Nivel de Riesgo",
     "allocationJurisdiction": "Asignación por Jurisdicción",
     "empty": {
-      "title": "Sin posiciones",
+      "title": "Sin posiciones aún",
+      "description": "Financia facturas en el mercado para comenzar a construir tu portafolio.",
       "message": "Financia facturas en el mercado para construir tu portafolio."
     },
     "fundTestnet": "Financiar Cuenta Testnet"
@@ -954,9 +969,49 @@
     "connectCta": "Conectar billetera",
     "navLabel": "Configuración",
     "openFull": "Abrir configuración completa",
-    "error": {
-      "title": "No se pudo cargar la configuración",
-      "description": "Tus preferencias guardadas no se modificaron. Vuelve a intentarlo para recargar tus ajustes de notificaciones y del recorrido, o regresa al inicio."
+    "notifications": {
+      "sectionTitle": "Preferencias de Notificaciones",
+      "sectionDesc": "Controla qué alertas aparecen durante tu flujo de trabajo.",
+      "maturityReminder": {
+        "label": "Recordatorios de Vencimiento",
+        "description": "Recuérdame antes de la fecha de vencimiento de la factura."
+      },
+      "fundingAlerts": {
+        "label": "Alertas de Financiamiento",
+        "description": "Notificar cuando tu factura alcance hitos de financiamiento."
+      },
+      "repaymentAlerts": {
+        "label": "Alertas de Pago",
+        "description": "Notificar cuando el pago esté próximo o completado."
+      },
+      "reminderTiming": {
+        "label": "Momento del recordatorio",
+        "description": "Elige cuándo alertar antes de la fecha de vencimiento.",
+        "day1": "1 día antes del vencimiento",
+        "day3": "3 días antes del vencimiento",
+        "day7": "7 días antes del vencimiento"
+      },
+      "resetDefaults": "Restablecer valores predeterminados",
+      "toggleAriaLabel": "Activar/desactivar {label}",
+      "tourSection": {
+        "title": "Recorrido de Incorporación"
+      },
+      "shortcutsSection": {
+        "title": "Atajos de Teclado",
+        "description": "Activa los atajos de teclado globales para una navegación más rápida.",
+        "enableLabel": "Activar atajos",
+        "enableDesc": "Presiona {key} para ver todos los atajos.",
+        "toggleAriaLabel": "Activar/desactivar atajos de teclado"
+      },
+      "diagnosticsSection": {
+        "title": "Diagnósticos de Soporte",
+        "description": "Exporta una instantánea redactada de sesión de billetera con estado de red y flags de características.",
+        "exportButton": "Exportar JSON de diagnósticos",
+        "importButton": "Importar diagnósticos",
+        "exportNote": "La exportación incluye proveedor, red, flags de sesión y flags de características. No se incluyen secretos, frases semilla, JWTs ni direcciones completas.",
+        "importSuccess": "Diagnósticos importados para depuración local.",
+        "importFailed": "Error al importar diagnósticos."
+      }
     }
   },
   "shortcuts": {

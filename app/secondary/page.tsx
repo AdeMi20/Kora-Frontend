@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EmptyState from "@/components/ui/EmptyState";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { toast } from "sonner";
 import { TxSimulationPreview } from "@/components/invoice/TxSimulationPreview";
 import { AcquirePositionDialog } from "@/components/invoice/AcquirePositionDialog";
@@ -319,15 +320,18 @@ function SecondaryMarketplaceContent() {
 
         {/* Seller analytics (#593/#655) — shown whenever the connected wallet has active listings */}
         {publicKey && myListings.length > 0 && (
-          <SellerAnalyticsDashboard
-            listings={myListings}
-            positions={myPositions}
-            className="mb-8"
-          />
+          <ErrorBoundary compact>
+            <SellerAnalyticsDashboard
+              listings={myListings}
+              positions={myPositions}
+              className="mb-8"
+            />
+          </ErrorBoundary>
         )}
 
         {/* Filter Controls Bar */}
-        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur-md">
+        <ErrorBoundary compact>
+          <div className="mb-6 flex flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur-md">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
@@ -423,8 +427,10 @@ function SecondaryMarketplaceContent() {
             </div>
           </div>
         </div>
+        </ErrorBoundary>
 
-        {/* Position Listings Grid — empty state when no listings or no filter matches */}
+        {/* Position Listings Grid */}
+        <ErrorBoundary>
         {sortedItems.length === 0 ? (
           allItems.length === 0 ? (
             /* True empty market — no listings at all */
@@ -587,6 +593,7 @@ function SecondaryMarketplaceContent() {
             })}
           </div>
         )}
+        </ErrorBoundary>
 
         {/* Issue #594: preview before signing; the dialog blocks proceed when
             the simulation fails. */}
