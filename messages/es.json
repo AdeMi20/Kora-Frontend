@@ -522,7 +522,12 @@
       "risk": "Riesgo",
       "dueDate": "Vencimiento",
       "claim": "Reclamar",
-      "view": "Ver →"
+      "view": "Ver →",
+      "listForSale": "Poner a la venta",
+      "unlist": "Retirar"
+    },
+    "listing": {
+      "success": "Posición puesta a la venta"
     },
     "activePositions": "Posiciones Activas",
     "allocationRisk": "Asignación por Nivel de Riesgo",
@@ -839,6 +844,12 @@
     "goHome": "Ir al Inicio",
     "goMarketplace": "Ir al Mercado"
   },
+  "globalError": {
+    "title": "Algo salió mal",
+    "description": "Un error crítico impidió que la aplicación se cargara. Recarga la página para intentarlo de nuevo.",
+    "tryAgain": "Intentar de Nuevo",
+    "reload": "Recargar página"
+  },
   "common": {
     "loading": "Cargando…",
     "connectWallet": "Conectar Billetera",
@@ -942,7 +953,11 @@
     "connectDesc": "La configuración se guarda por billetera. Conéctate para ver y cambiar tus preferencias.",
     "connectCta": "Conectar billetera",
     "navLabel": "Configuración",
-    "openFull": "Abrir configuración completa"
+    "openFull": "Abrir configuración completa",
+    "error": {
+      "title": "No se pudo cargar la configuración",
+      "description": "Tus preferencias guardadas no se modificaron. Vuelve a intentarlo para recargar tus ajustes de notificaciones y del recorrido, o regresa al inicio."
+    }
   },
   "shortcuts": {
     "title": "Atajos de Teclado",
@@ -1222,9 +1237,25 @@
     "dismiss": "Descartar",
     "snoozeDay": "Posponer 1 día",
     "snoozeWeek": "Posponer 1 semana",
+    "diversifyCta": "Buscar opciones para diversificar",
     "settings": "Ajustar umbrales",
     "critical": "Crítico",
-    "warning": "Advertencia"
+    "warning": "Advertencia",
+    "thresholdsTitle": "Umbrales de concentración",
+    "thresholdsDescription": "Marca tu cartera cuando un solo deudor, jurisdicción o nivel de riesgo supere estas proporciones de su valor.",
+    "dimensions": {
+      "debtor": "Deudor único",
+      "jurisdiction": "Jurisdicción única",
+      "riskTier": "Nivel de riesgo único"
+    },
+    "dimensionHints": {
+      "debtor": "Avisar cuando un deudor supere esta proporción de tu cartera.",
+      "jurisdiction": "Avisar cuando una jurisdicción supere esta proporción de tu cartera.",
+      "riskTier": "Avisar cuando un nivel de riesgo supere esta proporción de tu cartera."
+    },
+    "sliderAria": "Control deslizante del umbral: {dimension}",
+    "percentageAria": "Porcentaje del umbral: {dimension}",
+    "resetToDefaults": "Restablecer valores predeterminados"
   },
   "vintageCohorts": {
     "title": "Cohortes por añada",
@@ -1364,5 +1395,41 @@
     "legendItemAria": "Explorar el mercado filtrado por {name}: {percent}",
     "filteringBy": "Filtrando el mercado por <strong>{dimension}</strong>: {value}",
     "clearFilter": "Borrar filtro"
+  },
+  "kyc": {
+    "title": "Verificación KYC con Synaps",
+    "description": "Verifica tu identidad con Synaps para desbloquear límites de inversión más altos.",
+    "intro": {
+      "body": "Para cumplir con los estándares regulatorios globales, debes verificar tu identidad. Synaps gestiona el proceso de verificación de forma segura y tarda unos 2 minutos.",
+      "requirementsTitle": "Lo que necesitarás:",
+      "requirementId": "Documento de identidad oficial o pasaporte",
+      "requirementSelfie": "Una selfie nítida",
+      "requirementAddress": "Comprobante de domicilio (para límites de nivel superior)",
+      "start": "Iniciar verificación"
+    },
+    "upload": {
+      "docTypeLabel": "Selecciona el tipo de documento:",
+      "passport": "Pasaporte",
+      "idCard": "Documento nacional de identidad",
+      "dropzone": "Arrastra y suelta tu documento aquí, o haz clic para buscarlo",
+      "dropzoneHint": "Acepta PDF, JPG o PNG de hasta 10 MB",
+      "back": "Atrás",
+      "verifySuccess": "Verificar (éxito)",
+      "verifyFail": "Verificar (fallo)"
+    },
+    "verifying": {
+      "title": "Verificando documentos",
+      "body": "Las comprobaciones automáticas de Synaps están analizando tu documento y consultando las bases de datos de cumplimiento..."
+    },
+    "success": {
+      "title": "¡Identidad verificada correctamente!",
+      "body": "¡Gracias! Tu estado KYC ahora está verificado. Los límites de inversión de tu cuenta se han ampliado.",
+      "continue": "Continuar"
+    },
+    "failed": {
+      "title": "La verificación falló",
+      "body": "Synaps no pudo verificar tu documento automáticamente. Asegúrate de que la imagen del documento sea nítida, no esté recortada y todos los datos sean visibles.",
+      "retry": "Intentar de nuevo"
+    }
   }
 }

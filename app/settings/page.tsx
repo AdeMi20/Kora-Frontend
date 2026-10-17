@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Container } from "@/components/layout/Container";
+import { ConcentrationThresholdSettings } from "@/components/settings/ConcentrationThresholdSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { useWallet } from "@/hooks/useWallet";
 import { useUIStore } from "@/store";
@@ -54,6 +55,12 @@ export default function SettingsPage() {
       <Card className="max-w-2xl">
         <CardContent className="p-6">
           <NotificationSettings />
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6 max-w-2xl">
+        <CardContent className="p-6">
+          <ConcentrationThresholdSettings />
         </CardContent>
       </Card>
     </Container>

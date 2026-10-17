@@ -80,10 +80,12 @@ interface MarketplaceAnalyticsPayload {
   event: MarketplaceEventName;
 
   /**
-   * "deeplink" — visit originated from a shared / parameterised URL.
-   * "organic"  — user navigated directly or from an unparameterised URL.
+   * "deeplink"          — visit originated from a shared / parameterised URL.
+   * "organic"           — user navigated directly or from an unparameterised URL.
+   * "concentration_cta" — opened from a concentration-risk alert CTA
+   *                       (`?source=concentration_cta`, see below).
    */
-  source: "deeplink" | "organic";
+  source: "deeplink" | "organic" | "concentration_cta";
 
   /** Number of active filters at the time of the event (0 = no filters). */
   filter_count: number;
@@ -101,6 +103,23 @@ interface MarketplaceAnalyticsPayload {
   timestamp: number;
 }
 ```
+
+### Concentration alert CTA deep link (#944)
+
+`ConcentrationRiskAlerts` links each alert to the marketplace via
+`marketplacePathForConcentration` (`lib/concentrationMarketplaceLink.ts`). The
+link filters to every value of the overweight dimension *except* the
+concentrated one, using the existing filter params:
+
+| Alert dimension | Params                                                         |
+|-----------------|----------------------------------------------------------------|
+| `riskTier`      | `riskTiers=<all other tiers>&source=concentration_cta`         |
+| `jurisdiction`  | `jurisdictions=<all other codes>&source=concentration_cta`     |
+| `debtor`, or an unknown bucket | `source=concentration_cta` (unfiltered marketplace) |
+
+Bucket names pass through `sanitizeQueryParam` and must match a supported tier /
+jurisdiction code. `marketplace_land` fires with `source: "concentration_cta"`
+for these visits, including the unfiltered fallback.
 
 ---
 

@@ -13,6 +13,11 @@
  * banner and the acquire simulation-failure UI must both recover cleanly
  * without leaving a stuck modal behind.
  *
+ * Issue #942 adds URL filter sync coverage: filters write their query keys,
+ * survive reload and back/forward, and malformed params are sanitized. Those
+ * tests assert on the URL and the filter controls only, never on listing
+ * counts, so they do not depend on the mock listings.
+ *
  * Run:
  *   npx playwright test e2e/secondary-market.spec.ts
  */
@@ -92,22 +97,33 @@ async function suppressOverlays(page: Page) {
   }, LISTING_STORE_VALUE);
 }
 
-/** Each position card carries exactly one "Acquire Position" button. */
+/**
+ * Each position card carries exactly one acquire button — "Acquire Position"
+ * with a wallet connected, "Connect Wallet to Acquire" without one.
+ */
 function positionCards(page: Page) {
-  return page.getByRole("button", { name: /acquire position/i });
+  return page.getByRole("button", { name: /acquire position|connect wallet to acquire/i });
 }
 
 /**
  * Pick a value from one of the filter dropdowns.
  */
 async function chooseFilter(page: Page, currentLabel: string, optionLabel: string) {
-  await page.getByRole("button", { name: currentLabel, exact: true }).click();
-  await page.getByRole("option", { name: optionLabel }).click();
+  const option = page
+    .locator("[data-radix-popper-content-wrapper]")
+    .getByRole("button", { name: optionLabel, exact: true });
+  await expect(async () => {
+    if (!(await option.isVisible())) {
+      await page.getByRole("button", { name: currentLabel, exact: true }).click();
+    }
+    await expect(option).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await option.click();
 }
 
 const SELLER_PLACEHOLDER = "Seller G-address...";
 
-async function gotoSecondary(page: Page) {
+async function gotoSecondary(page: Page, search = "") {
   await suppressOverlays(page);
   await page.goto("/secondary", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: /secondary market/i })).toBeVisible({

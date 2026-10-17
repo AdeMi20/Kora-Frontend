@@ -131,10 +131,6 @@ function SecondaryMarketplaceContent() {
 
   const isFirstRender = useRef(true);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
     const qs = secondaryFiltersToQueryString({
       q: debouncedSearch,
       tenor: tenorFilter,
@@ -142,6 +138,12 @@ function SecondaryMarketplaceContent() {
       seller: debouncedSeller,
       highlight: highlightId,
     });
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      // A well-formed link is left alone; a malformed one (e.g. ?tenor=bogus or
+      // control characters in ?q) is rewritten to the sanitized state (#942).
+      if (qs === new URLSearchParams(window.location.search).toString()) return;
+    }
     const newUrl = qs ? `${pathname}?${qs}` : pathname;
     router.replace(newUrl, { scroll: false });
   }, [

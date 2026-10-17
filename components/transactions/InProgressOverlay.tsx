@@ -39,7 +39,6 @@ export function InProgressOverlay() {
   const provider = useWalletStore((s) => s.provider);
   const { escrowState, retryEscrow, resetEscrow } = useSecondaryEscrowFlow();
   const { cancel, extendTimeout } = useTransaction();
-  const t = useTranslations("transaction");
 
   const isSigningStage = txState.status === "signing";
   const isTimeoutStage = txState.status === "timeout";

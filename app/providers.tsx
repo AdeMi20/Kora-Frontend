@@ -7,6 +7,7 @@ import {
   persistQueryClientSubscribe,
 } from "@tanstack/query-persist-client-core";
 import { Toaster } from "sonner";
+import { useWatchlistAlerts } from "@/hooks/useWatchlistAlerts";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
@@ -106,7 +107,6 @@ function WatchlistAlertObserver() {
 export function Providers({ children }: { children: React.ReactNode }) {
   const onboardingTourEnabled = useFeatureFlag("onboarding-tour");
   const devtoolsEnabled = useFeatureFlag("devtools");
-  const [isPersistenceReady, setIsPersistenceReady] = useState(typeof window === "undefined");
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -116,12 +116,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
+  // The tree renders immediately rather than waiting for the restore: gating it
+  // on a client-only flag rendered `null` during hydration against server HTML
+  // that had the full tree, so React failed hydration and mounted a second copy
+  // of the app beside the first. Restoring into a live cache is safe — hydrate
+  // never overwrites newer query data.
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setIsPersistenceReady(true);
-      return;
-    }
-
     const persister = createIndexedDbPersister();
     let unsubscribe: (() => void) | undefined;
     let cancelled = false;
@@ -145,10 +145,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         });
       } catch (error) {
         console.warn("[QueryPersistence] Failed to restore marketplace cache.", error);
-      } finally {
-        if (!cancelled) {
-          setIsPersistenceReady(true);
-        }
       }
     };
 
@@ -180,7 +176,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!isPersistenceReady ? null : (
       <LocaleProvider allMessages={ALL_MESSAGES}>
         <ThemeProvider>
           {/* Raises the re-verification modal that `useVerifiedAction` awaits
@@ -206,7 +201,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
           </VerificationProvider>
         </ThemeProvider>
       </LocaleProvider>
-      )}
     </QueryClientProvider>
   );
 }

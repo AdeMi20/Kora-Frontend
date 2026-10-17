@@ -17,6 +17,7 @@ import {
   Search,
   Tag,
   Sparkles,
+  Settings,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -78,6 +79,7 @@ function ChangelogNavButton() {
 export function Navbar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const tSettings = useTranslations("settings");
   const isSecondaryEnabled = useFeatureFlag("secondary-market");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);

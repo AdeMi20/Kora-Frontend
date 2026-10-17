@@ -78,8 +78,7 @@ export function CommandPalette() {
   const setWalletModalOpen = useUIStore((s) => s.setWalletModalOpen);
   const [query, setQuery] = React.useState("");
   const { formatCurrency, formatPercentage } = useFormatters();
-  const t = useTranslations("commandPalette");
-  const synonyms = t("synonyms") as string[];
+  const synonyms = t.raw("synonyms") as string[];
 
   const pageCommands = React.useMemo(
     () =>
