@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Compass, Download, Keyboard, RotateCcw, Upload } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useUIStore } from "@/store/uiStore";
@@ -46,7 +46,7 @@ export function NotificationSettings() {
   const { notifications, setNotifications, resetNotifications, tour, setTourSettings, restartTour } = useSettingsStore();
   const shortcutsEnabled = useUIStore((s) => s.shortcutsEnabled);
   const setShortcutsEnabled = useUIStore((s) => s.setShortcutsEnabled);
-  const { exportWalletDiagnostics, importWalletDiagnostics } = useWallet();
+  const { address, exportWalletDiagnostics, importWalletDiagnostics } = useWallet();
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

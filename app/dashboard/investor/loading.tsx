@@ -1,4 +1,4 @@
-import { InvestorDashboardSkeleton } from "@/components/dashboard/InvestorDashboardSkeleton";
+import { InvestorDashboardSkeleton } from "@/components/ui/skeleton";
 
 export default function InvestorDashboardLoading() {
   return (

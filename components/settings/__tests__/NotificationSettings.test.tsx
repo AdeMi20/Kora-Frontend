@@ -30,7 +30,7 @@ const { restartTour, exportWalletDiagnostics, importWalletDiagnostics } = vi.hoi
 }));
 
 vi.mock("@/hooks/useWallet", () => ({
-  useWallet: () => ({ exportWalletDiagnostics, importWalletDiagnostics }),
+  useWallet: () => ({ address: null, exportWalletDiagnostics, importWalletDiagnostics }),
 }));
 
 // Env validation throws at import time without these vars

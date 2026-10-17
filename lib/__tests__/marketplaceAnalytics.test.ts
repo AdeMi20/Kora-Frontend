@@ -92,6 +92,24 @@ describe("marketplace analytics events", () => {
     expect(getLocalMarketplaceEvents()).toHaveLength(0);
   });
 
+  it("trackMarketplaceLand tags concentration alert CTA visits (#944)", () => {
+    trackMarketplaceLand(
+      makeParams({ riskTiers: "AAA,AA", source: "concentration_cta" }),
+      1,
+      null
+    );
+    const events = getLocalMarketplaceEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].source).toBe("concentration_cta");
+  });
+
+  it("trackMarketplaceLand fires for an unfiltered concentration CTA fallback", () => {
+    trackMarketplaceLand(makeParams({ source: "concentration_cta" }), 0, null);
+    const events = getLocalMarketplaceEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].source).toBe("concentration_cta");
+  });
+
   it("trackMarketplaceFilterApply fires regardless of source", () => {
     trackMarketplaceFilterApply(makeParams(), 2, "amount_desc");
     const events = getLocalMarketplaceEvents();

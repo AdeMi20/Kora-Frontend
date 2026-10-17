@@ -13,8 +13,10 @@ export interface WalletAssetConfig {
 
 export const TESTNET_USDC_ISSUER =
   "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
+// Circle's EURC testnet issuer. The previous placeholder failed the StrKey
+// checksum, so `new StellarSdk.Asset` threw at import and crashed every route.
 export const TESTNET_EURC_ISSUER =
-  "GBBD47IF6Q4X3GQ6J3KQW7R4Z5H7L7O2N6B4V6K3QG5N5YJQ5A6L7ABC";
+  "GB3Q6QDZYTHWT7E5PVS3W7FUT5GVAFC5KSZFFLPU25GO7VTC3NM2ZTVO";
 
 /**
  * Stellar asset objects + trustline helpers for onboarding flows (EURC/USDC).

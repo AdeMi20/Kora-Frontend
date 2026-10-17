@@ -98,6 +98,8 @@ export default defineConfig({
         process.env.NEXT_PUBLIC_ENABLE_BATCH_ACTIONS ?? "true",
       NEXT_PUBLIC_ENABLE_ONBOARDING_TOUR:
         process.env.NEXT_PUBLIC_ENABLE_ONBOARDING_TOUR ?? "true",
+      NEXT_PUBLIC_ENABLE_SECONDARY_MARKET:
+        process.env.NEXT_PUBLIC_ENABLE_SECONDARY_MARKET ?? "true",
       NEXT_PUBLIC_STELLAR_NETWORK: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet",
       NEXT_PUBLIC_STELLAR_RPC_URL:
         process.env.NEXT_PUBLIC_STELLAR_RPC_URL ?? "https://soroban-testnet.stellar.org",

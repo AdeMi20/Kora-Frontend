@@ -171,7 +171,7 @@ export default function InvestorDashboardPage() {
 
     const runClaim = async () => {
       await execute(() => prepareClaimPosition(pos.id, address), {
-        successMessage: "Claim submitted",
+        successMessage: t("claim.successMessage"),
         // Yield claims are the "yield available" notification channel, not the
         // generic tx one — muting that preference must mute this too.
         successNotificationType: "yieldAvailable",
@@ -191,8 +191,8 @@ export default function InvestorDashboardPage() {
     // the tree to raise the modal — surface the reason rather than failing mute.
     if (result.requiresVerification) {
       toast.error(
-        "Verification required",
-        "Verify wallet ownership to claim your yield.",
+        t("claim.verificationRequiredTitle"),
+        t("claim.verificationRequiredDesc"),
         () => {
           void handleClaim(pos);
         }
@@ -201,21 +201,76 @@ export default function InvestorDashboardPage() {
     }
 
     if (result.error && result.error !== "Wallet not connected") {
-      toast.error("Claim failed", result.error, () => {
+      toast.error(t("claim.failedTitle"), result.error, () => {
         void handleClaim(pos);
       });
     }
   };
 
-  const handleListSubmit = (askPrice: number) => {
-    if (!listingTarget) return;
+  const handleListSubmit = (askPrice: number, expiresAt?: string) => {
+    if (!listingTarget || !address) return;
     listPosition({
       positionId: listingTarget.id,
       askPrice,
-      seller: address ?? "",
+      impliedDiscount: computeImpliedDiscount(askPrice, listingTarget.expectedReturn),
+      listedAt: new Date().toISOString(),
+      expiresAt,
+      invoiceTokenId: listingTarget.invoice?.tokenId,
+      repaymentDate: listingTarget.invoice?.terms.repaymentDate,
     });
+    toast.success(t("listing.success"));
     setListingTarget(null);
   };
+
+  const columns: ColumnDef<InvestorPosition>[] = [
+    {
+      id: "invoice",
+      header: t("table.invoice"),
+      accessor: (row) => row.invoice?.metadata.invoiceNumber ?? row.invoiceId,
+    },
+    {
+      id: "invested",
+      header: t("table.invested"),
+      accessor: (row) => row.investedAmount,
+      cell: (row) => formatCurrency(row.investedAmount),
+    },
+    {
+      id: "expected",
+      header: t("table.expectedReturn"),
+      accessor: (row) => row.expectedReturn,
+      cell: (row) => formatCurrency(row.expectedReturn),
+    },
+    {
+      id: "actions",
+      header: "",
+      sortable: false,
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          {row.status === "repaid" && (
+            <Button size="sm" onClick={() => handleClaim(row)}>
+              {t("table.claim")}
+            </Button>
+          )}
+          {row.status === "active" &&
+            (listings[row.id] ? (
+              <Button size="sm" variant="outline" onClick={() => unlistPosition(row.id)}>
+                {t("table.unlist")}
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setListingTarget(row)}>
+                <Tag className="h-3.5 w-3.5" aria-hidden /> {t("table.listForSale")}
+              </Button>
+            ))}
+          <Link
+            href={`/marketplace/${row.invoice?.id ?? row.invoiceId}`}
+            className="text-xs text-primary hover:opacity-80"
+          >
+            {t("table.view")}
+          </Link>
+        </div>
+      ),
+    },
+  ];
 
   const stats = useMemo(
     () => [
@@ -224,14 +279,14 @@ export default function InvestorDashboardPage() {
         value: formatCurrency(
           positionsData.reduce((sum, p) => sum + p.investedAmount, 0),
         ),
-        icon: DollarSign,
+        icon: <DollarSign className="h-4 w-4" />,
       },
       {
         label: t("stats.expectedReturn"),
         value: formatCurrency(
           positionsData.reduce((sum, p) => sum + p.expectedReturn, 0),
         ),
-        icon: TrendingUp,
+        icon: <TrendingUp className="h-4 w-4" />,
       },
       {
         label: t("stats.yieldEarned"),
@@ -241,12 +296,12 @@ export default function InvestorDashboardPage() {
             0,
           ),
         ),
-        icon: BarChart3,
+        icon: <BarChart3 className="h-4 w-4" />,
       },
       {
         label: t("stats.activePositions"),
         value: String(positionsData.length),
-        icon: Store,
+        icon: <Store className="h-4 w-4" />,
       },
     ],
     [positionsData, formatCurrency, t],

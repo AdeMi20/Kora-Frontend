@@ -1,5 +1,5 @@
 import React from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslations } from "next-intl";
 
 export const JURISDICTIONS = [
   { code: "US", name: "United States", flag: "🇺🇸" },
@@ -54,8 +54,8 @@ export const YIELD_OPTIONS = [
  * stable code as the value used in URLs and filtering logic.
  */
 export function useJurisdictionLabel() {
-  const { t } = useTranslation();
-  return (code: string) => t(`jurisdictions.${code}`, { defaultValue: code });
+  const t = useTranslations();
+  return (code: string) => (t.has(`jurisdictions.${code}`) ? t(`jurisdictions.${code}`) : code);
 }
 
 /**
@@ -63,8 +63,8 @@ export function useJurisdictionLabel() {
  * stable key as the value used in URLs and filtering logic.
  */
 export function useCategoryLabel() {
-  const { t } = useTranslation();
-  return (key: string) => t(`categories.${key}`, { defaultValue: key });
+  const t = useTranslations();
+  return (key: string) => (t.has(`categories.${key}`) ? t(`categories.${key}`) : key);
 }
 
 /**
@@ -72,8 +72,8 @@ export function useCategoryLabel() {
  * stable value as the value used in URLs and filtering logic.
  */
 export function useTenorLabel() {
-  const { t } = useTranslation();
-  return (value: string) => t(`tenors.${value}`, { defaultValue: value });
+  const t = useTranslations();
+  return (value: string) => (t.has(`tenors.${value}`) ? t(`tenors.${value}`) : value);
 }
 
 /**
@@ -81,6 +81,6 @@ export function useTenorLabel() {
  * stable value as the value used in URLs and filtering logic.
  */
 export function useYieldLabel() {
-  const { t } = useTranslation();
-  return (value: string) => t(`yields.${value}`, { defaultValue: value });
+  const t = useTranslations();
+  return (value: string) => (t.has(`yields.${value}`) ? t(`yields.${value}`) : value);
 }

@@ -3,14 +3,20 @@
  *
  * Browse-flow coverage for the secondary market page (Issue #675).
  *
- * /secondary renders from mock listings that are stable in CI, so the whole
- * flow is deterministic without any network stubbing: load the grid, narrow it
- * with a tenor filter, reset back to the full grid, and drive the same filters
- * through the mobile bottom sheet.
+ * Since MOCK_SECONDARY_LISTINGS was removed (Issue #TODO), the page now derives
+ * its listing grid entirely from the persisted `kora-position-listings` Zustand
+ * store.  We seed deterministic fixture listings via localStorage in the
+ * `suppressOverlays` helper so the whole flow remains stable in CI without any
+ * network stubbing.
  *
  * Issue #899 adds failure-path coverage: the AcceptTransfer stub failure
  * banner and the acquire simulation-failure UI must both recover cleanly
  * without leaving a stuck modal behind.
+ *
+ * Issue #942 adds URL filter sync coverage: filters write their query keys,
+ * survive reload and back/forward, and malformed params are sanitized. Those
+ * tests assert on the URL and the filter controls only, never on listing
+ * counts, so they do not depend on the mock listings.
  *
  * Run:
  *   npx playwright test e2e/secondary-market.spec.ts
@@ -18,45 +24,117 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-/** Dismiss tour + changelog so neither overlays the page under test. */
+// ── Fixture listings ─────────────────────────────────────────────────────────
+//
+// These mirror what MOCK_SECONDARY_LISTINGS used to provide inline.  They are
+// stored under the `kora-position-listings` key so the positionListingStore
+// hydrates them on page load (same path as a real user who has listed positions
+// from their investor dashboard).
+//
+// Invoice IDs reference MOCK_INVOICES[0..2] (inv_001..inv_003), which are always
+// present when NEXT_PUBLIC_ENABLE_MOCK_DATA=true.  The invoiceStore is populated
+// by the marketplace loader, so we only need to write the listing side here.
+
+const FIXTURE_LISTINGS = {
+  pos_101: {
+    positionId: "pos_101",
+    askPrice: 4850,
+    impliedDiscount: 0.03,
+    listedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    repaymentDate: new Date(Date.now() + 86400000 * 45).toISOString(),
+    invoiceTokenId: "1",
+    ownershipConfirmed: true,
+    ownershipCheckedAt: new Date().toISOString(),
+  },
+  pos_102: {
+    positionId: "pos_102",
+    askPrice: 9700,
+    impliedDiscount: 0.049,
+    listedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    repaymentDate: new Date(Date.now() + 86400000 * 20).toISOString(),
+    invoiceTokenId: "2",
+    ownershipConfirmed: true,
+    ownershipCheckedAt: new Date().toISOString(),
+  },
+  pos_103: {
+    positionId: "pos_103",
+    askPrice: 2400,
+    impliedDiscount: 0.059,
+    listedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    repaymentDate: new Date(Date.now() + 86400000 * 75).toISOString(),
+    invoiceTokenId: "3",
+    ownershipConfirmed: true,
+    ownershipCheckedAt: new Date().toISOString(),
+  },
+  pos_104: {
+    positionId: "pos_104",
+    askPrice: 5100,
+    impliedDiscount: 0.012,
+    listedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    repaymentDate: new Date(Date.now() + 86400000 * 10).toISOString(),
+    invoiceTokenId: "4",
+    ownershipConfirmed: true,
+    ownershipCheckedAt: new Date().toISOString(),
+  },
+};
+
+// The Zustand persist middleware wraps state under a `{ state: { listings: ... }, version: 0 }` envelope.
+const LISTING_STORE_VALUE = JSON.stringify({
+  state: { listings: FIXTURE_LISTINGS },
+  version: 0,
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Dismiss tour + changelog, seed listing store so the grid has data. */
 async function suppressOverlays(page: Page) {
-  await page.addInitScript(() => {
+  await page.addInitScript((storeValue: string) => {
     localStorage.setItem("kora-tour-done", "true");
     localStorage.setItem("kora-changelog-seen-version", "0.1.0");
-  });
+    // Seed the persisted position-listing store so the secondary page renders
+    // real listing cards instead of the empty-market state.
+    localStorage.setItem("kora-position-listings", storeValue);
+  }, LISTING_STORE_VALUE);
 }
 
-/** Each position card carries exactly one "Acquire Position" button. */
+/**
+ * Each position card carries exactly one acquire button — "Acquire Position"
+ * with a wallet connected, "Connect Wallet to Acquire" without one.
+ */
 function positionCards(page: Page) {
-  return page.getByRole("button", { name: /acquire position/i });
+  return page.getByRole("button", { name: /acquire position|connect wallet to acquire/i });
 }
 
 /**
  * Pick a value from one of the filter dropdowns.
- *
- * The Select renders a hidden native <select> for form libraries plus a Radix
- * popover for the actual UI, so the accessible label belongs to the hidden
- * element — the visible control has to be driven by its current label.
  */
 async function chooseFilter(page: Page, currentLabel: string, optionLabel: string) {
-  await page.getByRole("button", { name: currentLabel, exact: true }).click();
-  await page.getByRole("option", { name: optionLabel }).click();
+  const option = page
+    .locator("[data-radix-popper-content-wrapper]")
+    .getByRole("button", { name: optionLabel, exact: true });
+  await expect(async () => {
+    if (!(await option.isVisible())) {
+      await page.getByRole("button", { name: currentLabel, exact: true }).click();
+    }
+    await expect(option).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await option.click();
 }
 
 const SELLER_PLACEHOLDER = "Seller G-address...";
 
-async function gotoSecondary(page: Page) {
+async function gotoSecondary(page: Page, search = "") {
   await suppressOverlays(page);
-  // domcontentloaded rather than load: dev-server chunk requests can keep the
-  // load event pending well past the point the page is interactive.
   await page.goto("/secondary", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: /secondary market/i })).toBeVisible({
     timeout: 15_000,
   });
 }
 
+// ─── Browse tests ────────────────────────────────────────────────────────────
+
 test.describe("Secondary market browse", () => {
-  test("renders the mock position listings", async ({ page }) => {
+  test("renders listed positions from the store", async ({ page }) => {
     await gotoSecondary(page);
 
     await expect(positionCards(page).first()).toBeVisible({ timeout: 15_000 });
@@ -75,7 +153,10 @@ test.describe("Secondary market browse", () => {
 
     const before = await positionCards(page).count();
 
-    // 0–30 days is the narrowest bucket, so it cannot match every mock listing.
+    // 0–30 days is the narrowest bucket; pos_104 (10 days) matches but the
+    // others (45d, 20d exceeds? no — 20 < 30, so pos_102 also matches)
+    // In any case this filter should produce fewer than the full set because
+    // pos_101 (45d) and pos_103 (75d) are excluded.
     await chooseFilter(page, "All Tenors", "0 - 30 days");
 
     await expect
@@ -105,7 +186,7 @@ test.describe("Secondary market browse", () => {
     await gotoSecondary(page);
     await expect(positionCards(page).first()).toBeVisible({ timeout: 15_000 });
 
-    // No mock seller matches this address.
+    // No fixture seller matches this address.
     await page
       .getByPlaceholder(SELLER_PLACEHOLDER)
       .first()
@@ -149,7 +230,28 @@ test.describe("Secondary market browse", () => {
       timeout: 10_000,
     });
   });
+
+  test("fresh install with no listings shows empty market state", async ({ page }) => {
+    // Suppress only the overlays — do NOT seed any listings
+    await page.addInitScript(() => {
+      localStorage.setItem("kora-tour-done", "true");
+      localStorage.setItem("kora-changelog-seen-version", "0.1.0");
+    });
+    await page.goto("/secondary", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /secondary market/i })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // No listing cards — should show empty market state with no CTA button
+    await expect(page.getByText(/no transferable positions found/i)).toBeVisible({
+      timeout: 10_000,
+    });
+    // Empty market state has no "Clear All Filters" CTA (filters are not active)
+    await expect(page.getByRole("button", { name: /clear all filters/i })).not.toBeVisible();
+  });
 });
+
+// ─── Failure UX tests ────────────────────────────────────────────────────────
 
 test.describe("Secondary market failure UX", () => {
   test("accepting a transfer surfaces the stub failure banner", async ({ page }) => {
@@ -177,8 +279,6 @@ test.describe("Secondary market failure UX", () => {
 
     await positionCards(page).first().click();
 
-    // The acquire flow may open a modal; if it does, a simulated failure must
-    // not leave it stuck open.
     const dialog = page.getByRole("dialog");
     if (await dialog.isVisible().catch(() => false)) {
       const confirm = dialog.getByRole("button", { name: /acquire|confirm|buy/i }).last();
@@ -186,8 +286,6 @@ test.describe("Secondary market failure UX", () => {
         await confirm.click();
       }
 
-      // Either the modal closes on failure or it shows an inline error — but it
-      // must never remain in a stuck, unresponsive state.
       await expect
         .poll(
           async () => {
@@ -205,14 +303,13 @@ test.describe("Secondary market failure UX", () => {
         .not.toBe("stuck");
     }
 
-    // The page itself must remain usable after the failure.
     await expect(page.getByRole("heading", { name: /secondary market/i })).toBeVisible();
   });
 });
 
+// ─── Mobile tests ────────────────────────────────────────────────────────────
+
 test.describe("Secondary market on mobile", () => {
-  // Viewport only — a full device descriptor would switch browser type inside
-  // a describe, which Playwright rejects.
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
   test("filters are reached through the bottom sheet", async ({ page }) => {

@@ -16,6 +16,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useUIStore, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_SHORTCUTS_ENABLED } from "@/store/uiStore";
+import { useSettingsStore, DEFAULT_NOTIFICATION_PREFS } from "@/store/settingsStore";
 
 describe("uiStore", () => {
   beforeEach(() => {
@@ -31,6 +32,9 @@ describe("uiStore", () => {
       notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
       shortcutsEnabled: DEFAULT_SHORTCUTS_ENABLED,
     });
+    // The canonical notification store is the write-through target of the
+    // deprecated setters; reset it too so forwarding assertions are isolated.
+    useSettingsStore.setState({ notifications: { ...DEFAULT_NOTIFICATION_PREFS } });
     localStorage.clear();
     vi.useFakeTimers();
   });
@@ -203,7 +207,7 @@ describe("uiStore", () => {
     });
   });
 
-  describe("notificationPreferences", () => {
+  describe("notificationPreferences (deprecated mirror)", () => {
     it("defaults to DEFAULT_NOTIFICATION_PREFERENCES", () => {
       expect(useUIStore.getState().notificationPreferences).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
     });
@@ -216,6 +220,15 @@ describe("uiStore", () => {
       expect(prefs.maturityReminder).toBe(true); // unchanged
       expect(prefs.yieldAvailable).toBe(true); // unchanged
       expect(prefs.maturityReminderDays).toBe(3); // unchanged
+    });
+
+    it("forwards writes to the canonical settingsStore", () => {
+      useUIStore.getState().setNotificationPreferences({ txConfirmed: false });
+
+      // The canonical store is what every notification gate reads, so the
+      // legacy setter must keep it in sync rather than only mutating the
+      // deprecated mirror.
+      expect(useSettingsStore.getState().notifications.txConfirmed).toBe(false);
     });
 
     it("setNotificationPreferences updates multiple preferences", () => {
@@ -238,6 +251,13 @@ describe("uiStore", () => {
       });
       useUIStore.getState().resetNotificationPreferences();
       expect(useUIStore.getState().notificationPreferences).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+    });
+
+    it("resetNotificationPreferences resets the canonical store too", () => {
+      useUIStore.getState().setNotificationPreferences({ txConfirmed: false });
+      useUIStore.getState().resetNotificationPreferences();
+
+      expect(useSettingsStore.getState().notifications).toEqual(DEFAULT_NOTIFICATION_PREFS);
     });
 
     it("validates maturityReminderDays values", () => {
@@ -265,9 +285,10 @@ describe("uiStore", () => {
   });
 
   describe("persist middleware", () => {
-    it("partializes state to only persist theme, notificationPreferences, shortcutsEnabled", () => {
-      // The persist config uses partialize to only save these fields
-      const state = useUIStore.getState();
+    it("partializes state to only persist theme and shortcutsEnabled", () => {
+      // The persist config uses partialize to only save these fields;
+      // notificationPreferences are canonical in settingsStore, not duplicated
+      // here (duplication is what let the two copies drift).
       const { partialize } = useUIStore.persist.getOptions();
 
       const partialized = partialize({
@@ -284,7 +305,6 @@ describe("uiStore", () => {
 
       expect(partialized).toEqual({
         theme: "dark",
-        notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES, txConfirmed: false },
         shortcutsEnabled: false,
       });
     });
@@ -300,12 +320,13 @@ describe("uiStore", () => {
       expect(parsed.state.theme).toBe("dark");
     });
 
-    it("persists notificationPreferences to localStorage", () => {
+    it("does not persist notificationPreferences to localStorage", () => {
       useUIStore.getState().setNotificationPreferences({ txConfirmed: false });
 
       const stored = localStorage.getItem("kora-ui-store");
       const parsed = JSON.parse(stored!);
-      expect(parsed.state.notificationPreferences.txConfirmed).toBe(false);
+      // The canonical copy lives in `kora-settings-store`.
+      expect(parsed.state.notificationPreferences).toBeUndefined();
     });
 
     it("persists shortcutsEnabled to localStorage", () => {
