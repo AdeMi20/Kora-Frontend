@@ -956,7 +956,11 @@
     "connectDesc": "Settings are stored per wallet. Connect to view and change your preferences.",
     "connectCta": "Connect wallet",
     "navLabel": "Settings",
-    "openFull": "Open full settings"
+    "openFull": "Open full settings",
+    "error": {
+      "title": "Settings couldn't load",
+      "description": "Your saved preferences weren't changed. Try again to reload your notification and tour settings, or head back home."
+    }
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

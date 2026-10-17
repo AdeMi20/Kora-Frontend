@@ -3,7 +3,12 @@
  * Consistent with walletStore pattern. All notifications default to true on first load.
  */
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import {
+  safeStorageGetItem,
+  safeStorageRemoveItem,
+  safeStorageSetItem,
+} from "./storageAdapter";
 
 import {
   DEFAULT_CONCENTRATION_THRESHOLDS,
@@ -164,6 +169,14 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: "kora-settings-store",
+      // Writes go through the safe helpers so a full or blocked storage (e.g.
+      // QuotaExceededError on dismiss) keeps the in-memory change instead of
+      // throwing out of the click handler (#943).
+      storage: createJSONStorage(() => ({
+        getItem: safeStorageGetItem,
+        setItem: safeStorageSetItem,
+        removeItem: safeStorageRemoveItem,
+      })),
     }
   )
 );

@@ -8,7 +8,7 @@
  * to /api/vitals for monitoring.
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AlertTriangle, Home, RefreshCw, Store } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -19,19 +19,38 @@ import { logger } from "@/lib/logger";
 interface ErrorPageProps {
   error: Error & { digest?: string };
   reset: () => void;
+  /** Route-specific heading; defaults to the generic `error.title`. */
+  title?: string;
+  /** Route-specific explanation; defaults to the generic `error.description`. */
+  description?: string;
+  /** Boundary name reported alongside the digest, e.g. "SettingsError". */
+  boundary?: string;
 }
 
-export function ErrorPage({ error, reset }: ErrorPageProps) {
+export function ErrorPage({
+  error,
+  reset,
+  title,
+  description,
+  boundary = "ErrorPage",
+}: ErrorPageProps) {
   const t = useTranslations("error");
   const queryClient = useQueryClient();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Move focus to the failure so keyboard and screen-reader users land on it
+  // instead of wherever focus was inside the segment that just unmounted.
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     logger.reportClientError(error, {
-      boundary: "ErrorPage",
+      boundary,
       digest: error.digest,
       route: typeof window !== "undefined" ? window.location.pathname : null,
     });
-  }, [error]);
+  }, [error, boundary]);
 
   /**
    * Most route errors here are a failed data fetch. `reset()` alone re-renders
@@ -53,8 +72,14 @@ export function ErrorPage({ error, reset }: ErrorPageProps) {
       <div role="alert" aria-live="assertive" className="space-y-2">
         {/* Kora logo text */}
         <p className="text-xs font-semibold uppercase tracking-widest text-teal-500">⬡ Kora</p>
-        <h1 className="text-2xl font-bold text-zinc-100">{t("title")}</h1>
-        <p className="max-w-md text-sm text-zinc-400">{t("description")}</p>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-2xl font-bold text-zinc-100 focus:outline-none"
+        >
+          {title ?? t("title")}
+        </h1>
+        <p className="max-w-md text-sm text-zinc-400">{description ?? t("description")}</p>
         {process.env.NODE_ENV === "development" && error.message && (
           <p className="mx-auto max-w-md rounded bg-zinc-800 px-3 py-1.5 font-mono text-xs text-zinc-500">
             {error.message}

@@ -1,25 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { ErrorPage } from "@/components/ui/ErrorPage";
 
-import { ErrorPage } from "@/components/error-page";
-
-export default function Error({
+export default function SecondaryError({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
-  return (
-    <ErrorPage
-      title="Something went wrong"
-      description="An error occurred while loading this page."
-      onRetry={reset}
-    />
-  );
+  return <ErrorPage error={error} reset={reset} />;
 }
