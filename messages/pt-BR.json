@@ -516,7 +516,12 @@
       "risk": "Risco",
       "dueDate": "Vencimento",
       "claim": "Resgatar",
-      "view": "Ver →"
+      "view": "Ver →",
+      "listForSale": "Colocar à venda",
+      "unlist": "Retirar"
+    },
+    "listing": {
+      "success": "Posição colocada à venda"
     },
     "activePositions": "Posições Ativas",
     "allocationRisk": "Alocação por Nível de Risco",
@@ -942,7 +947,11 @@
     "connectDesc": "As configurações são salvas por carteira. Conecte-se para ver e alterar suas preferências.",
     "connectCta": "Conectar carteira",
     "navLabel": "Configurações",
-    "openFull": "Abrir configurações completas"
+    "openFull": "Abrir configurações completas",
+    "error": {
+      "title": "Não foi possível carregar as configurações",
+      "description": "Suas preferências salvas não foram alteradas. Tente novamente para recarregar suas configurações de notificação e do tour, ou volte para o início."
+    }
   },
   "shortcuts": {
     "title": "Atalhos de Teclado",
@@ -1222,6 +1231,7 @@
     "dismiss": "Dispensar",
     "snoozeDay": "Adiar 1 dia",
     "snoozeWeek": "Adiar 1 semana",
+    "diversifyCta": "Encontrar opções de diversificação",
     "settings": "Ajustar limites",
     "critical": "Crítico",
     "warning": "Aviso",
@@ -1379,5 +1389,41 @@
     "legendItemAria": "Explorar o marketplace filtrado por {name}: {percent}",
     "filteringBy": "Filtrando o marketplace por <strong>{dimension}</strong>: {value}",
     "clearFilter": "Limpar filtro"
+  },
+  "kyc": {
+    "title": "Verificação KYC com Synaps",
+    "description": "Verifique sua identidade com a Synaps para desbloquear limites de investimento maiores.",
+    "intro": {
+      "body": "Para cumprir os padrões regulatórios globais, você precisa verificar sua identidade. O processo de verificação é conduzido com segurança pela Synaps e leva cerca de 2 minutos.",
+      "requirementsTitle": "O que você vai precisar:",
+      "requirementId": "Documento de identidade oficial ou passaporte",
+      "requirementSelfie": "Uma selfie nítida",
+      "requirementAddress": "Comprovante de endereço (para limites de nível superior)",
+      "start": "Iniciar verificação"
+    },
+    "upload": {
+      "docTypeLabel": "Selecione o tipo de documento:",
+      "passport": "Passaporte",
+      "idCard": "Carteira de identidade",
+      "dropzone": "Arraste e solte seu documento aqui ou clique para procurar",
+      "dropzoneHint": "Aceita PDF, JPG ou PNG de até 10 MB",
+      "back": "Voltar",
+      "verifySuccess": "Verificar (sucesso)",
+      "verifyFail": "Verificar (falha)"
+    },
+    "verifying": {
+      "title": "Verificando documentos",
+      "body": "As verificações automáticas da Synaps estão analisando seu documento e consultando bases de dados de conformidade..."
+    },
+    "success": {
+      "title": "Identidade verificada com sucesso!",
+      "body": "Obrigado! Seu status KYC agora está verificado. Os limites de investimento da sua conta foram ampliados.",
+      "continue": "Continuar"
+    },
+    "failed": {
+      "title": "Falha na verificação",
+      "body": "A Synaps não conseguiu verificar seu documento automaticamente. Certifique-se de que a imagem do documento esteja nítida, sem cortes e com todos os dados visíveis.",
+      "retry": "Tentar novamente"
+    }
   }
 }

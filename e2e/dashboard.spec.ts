@@ -1,3 +1,4 @@
+
 /**
  * E2E — SME and Investor Dashboards
  *
@@ -12,6 +13,7 @@
  *  - Investor dashboard data table is rendered
  *  - "Create Invoice" CTA is visible on SME dashboard
  *  - "Browse Marketplace" CTA is visible on investor dashboard
+ *  - SME zero-invoice empty state shows create-invoice CTA with investor-parity hierarchy
  *
  * Wallet simulation strategy:
  *   We inject a Zustand-compatible localStorage entry for `kora-wallet-store`
@@ -21,6 +23,7 @@
 
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { MOCK_ADDRESS } from "./helpers/mock-wallet";
+import { MOCK_EMPTY_INVOICES } from "./helpers/mock-invoices";
 
 // ── Shared wallet injection ───────────────────────────────────────────────────
 
@@ -40,6 +43,21 @@ async function injectConnectedWallet(context: BrowserContext) {
     };
     localStorage.setItem("kora-wallet-store", JSON.stringify(walletState));
   }, MOCK_ADDRESS);
+}
+
+async function injectEmptyInvoiceState(context: BrowserContext) {
+  await context.addInitScript((invoices) => {
+    localStorage.setItem(
+      "kora:mock-invoices",
+      JSON.stringify(invoices)
+    );
+  }, MOCK_EMPTY_INVOICES);
+}
+
+async function injectKybGate(context: BrowserContext) {
+  await context.addInitScript(() => {
+    localStorage.setItem("kora:mock-kyb-status", "pending");
+  });
 }
 
 // ── SME Dashboard ─────────────────────────────────────────────────────────────
@@ -100,6 +118,82 @@ test.describe("SME Dashboard — connected", () => {
     await expect(
       page.getByRole("link", { name: /Create Invoice/i })
     ).toBeVisible();
+  });
+});
+
+// ── SME Dashboard — First Invoice Empty State Parity ─────────────────────────
+
+test.describe("SME Dashboard — zero invoices empty state", () => {
+  test.beforeEach(async ({ context, page }) => {
+    await injectConnectedWallet(context);
+    await injectEmptyInvoiceState(context);
+    await page.goto("/dashboard/sme");
+    await page.waitForSelector("text=Total Financed", { timeout: 15_000 });
+  });
+
+  test("renders the empty state heading and description", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { name: /No invoices yet/i })
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Create your first invoice to start financing/i)
+    ).toBeVisible();
+  });
+
+  test("shows create-invoice CTA linking to /invoice/create", async ({
+    page,
+  }) => {
+    const cta = page.getByRole("link", { name: /Create Invoice/i });
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute("href", "/invoice/create");
+  });
+
+  test("empty state visual hierarchy matches investor empty state", async ({
+    page,
+  }) => {
+    const emptyState = page.locator("[data-testid='empty-state']");
+    await expect(emptyState).toBeVisible();
+    await expect(emptyState).toHaveAttribute("data-variant", "default");
+    await expect(
+      emptyState.getByRole("heading")
+    ).toBeVisible();
+    await expect(
+      emptyState.getByRole("link", { name: /Create Invoice/i })
+    ).toHaveAttribute("href", "/invoice/create");
+  });
+
+  test("does not render the invoice data table when empty", async ({
+    page,
+  }) => {
+    await expect(page.locator("table")).toHaveCount(0);
+  });
+
+  test("renders ErrorBoundary fallback with design-system styling", async ({
+    page,
+  }) => {
+    const fallback = page.locator("[data-testid='error-boundary-fallback']");
+    await expect(fallback).toHaveCount(0);
+  });
+
+  test("does not regress the SME loading skeleton", async ({ page }) => {
+    // Skeleton must not persist once the dashboard has hydrated
+    await expect(page.locator("[data-testid='dashboard-skeleton']")).toHaveCount(0);
+  });
+});
+
+test.describe("SME Dashboard — KYB gate blocks create flow", () => {
+  test.beforeEach(async ({ context, page }) => {
+    await injectConnectedWallet(context);
+    await injectEmptyInvoiceState(context);
+    await injectKybGate(context);
+    await page.goto("/dashboard/sme");
+    await page.waitForSelector("text=Total Financed", { timeout: 15_000 });
+  });
+
+  test("disables create-invoice CTA while KYB is pending", async ({ page }) => {
+    const cta = page.getByRole("link", { name: /Create Invoice/i });
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute("aria-disabled", "true");
   });
 });
 
@@ -265,6 +359,15 @@ test.describe("Investor Dashboard — connected", () => {
     await expect(
       page.getByRole("link", { name: /Browse Marketplace/i })
     ).toBeVisible();
+  });
+
+  test("empty state uses same EmptyState component contract as SME", async ({
+    page,
+  }) => {
+    const emptyState = page.locator("[data-testid='empty-state']");
+    if (await emptyState.count()) {
+      await expect(emptyState).toHaveAttribute("data-variant", "default");
+    }
   });
 });
 

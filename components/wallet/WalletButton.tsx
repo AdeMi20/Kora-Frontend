@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, LogOut, ExternalLink, Bell, Coins, Loader2, AlertCircle, RefreshCw, UserCheck, Eye, ArrowUpRight } from "lucide-react";
+import { ChevronDown, LogOut, ExternalLink, Bell, Coins, Loader2, AlertCircle, RefreshCw, UserCheck, Eye, ArrowUpRight, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useWallet } from "@/hooks/useWallet";
+import { useKycStatusSync } from "@/hooks/useKycStatusSync";
+import { SynapsKycModal } from "@/components/wallet/SynapsKycModal";
 import { useWalletBalances } from "@/hooks/useWalletBalances";
 import { useWalletStore } from "@/store";
 import { useToast } from "@/hooks/useToast";

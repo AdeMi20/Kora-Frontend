@@ -37,6 +37,9 @@ export function ListPositionDialog({
 }: ListPositionDialogProps) {
   const [askPrice, setAskPrice] = useState<string>("");
   const [showValidation, setShowValidation] = useState(false);
+  // Declared before the `!position` early return: the dialog mounts with a
+  // null position and receives one when opened, so hook order must not change.
+  const [expiresAt, setExpiresAt] = useState<string>("");
   const { formatCurrency, formatPercentage } = useFormatters();
 
   if (!position) return null;
@@ -58,8 +61,6 @@ export function ListPositionDialog({
   // Validation states
   const isAskPriceValid = askIsValid && priceIsReasonable;
   const showValidationWarnings = showValidation || askPrice.length > 0;
-
-  const [expiresAt, setExpiresAt] = useState<string>("");
 
 const handleSubmit = () => {
     if (!isAskPriceValid) {

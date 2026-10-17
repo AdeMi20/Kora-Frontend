@@ -12,7 +12,12 @@
  * folded in once via `onRehydrateStorage` so existing users keep their choices.
  */
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import {
+  safeStorageGetItem,
+  safeStorageRemoveItem,
+  safeStorageSetItem,
+} from "./storageAdapter";
 
 import {
   DEFAULT_CONCENTRATION_THRESHOLDS,
