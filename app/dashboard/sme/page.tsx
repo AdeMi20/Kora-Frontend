@@ -12,6 +12,7 @@ import { RepaymentDialog } from "@/components/invoice/RepaymentDialog";
 import { DashboardSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BatchResultSummary } from "@/components/dashboard/BatchActionToolbar";
+import { BatchActionsDisabledNotice } from "@/components/dashboard/BatchActionsDisabledNotice";
 import {
   prepareCancelInvoice,
   prepareRepayInvoice,
@@ -505,6 +506,8 @@ export default function SMEDashboardPage() {
           </Button>
         </Link>
       </div>
+
+      <BatchActionsDisabledNotice />
 
       {address && (
         <Suspense fallback={<StatsGridSkeleton />}>

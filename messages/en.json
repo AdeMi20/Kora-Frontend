@@ -456,6 +456,9 @@
       "message": "Create your first invoice to start raising liquidity."
     },
     "batch": {
+      "disabledTitle": "Batch actions are turned off",
+      "disabledDesc": "Batch cancel and repay are disabled on this deployment. Self-hosted operators can enable them by setting {envVar}=true.",
+      "disabledDocs": "Feature flag docs",
       "title": "Batch Operation Summary",
       "exportSelected": "Export selected",
       "processingLabel": "Cancelling {count} invoices..."
