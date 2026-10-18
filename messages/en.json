@@ -1506,5 +1506,23 @@
       "body": "Synaps was unable to verify your document automatically. Make sure the document image is clear, uncropped, and all details are visible.",
       "retry": "Try Again"
     }
+  },
+  "pwa": {
+    "manifest": {
+      "shortcuts": {
+        "marketplace": {
+          "shortName": "Market",
+          "description": "Browse invoice listings"
+        },
+        "createInvoice": {
+          "shortName": "Create",
+          "description": "Tokenize a new invoice"
+        }
+      },
+      "screenshots": {
+        "wide": "Kora Protocol Marketplace",
+        "narrow": "Kora Protocol on Mobile"
+      }
+    }
   }
 }

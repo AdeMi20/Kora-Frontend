@@ -48,6 +48,8 @@ import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { VerificationProvider } from "@/components/wallet/VerificationProvider";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { useUIStore } from "@/store/uiStore";
+import { useWalletStore } from "@/store/walletStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { useFeatureFlag } from "@/lib/featureFlags";
 import {
   createIndexedDbPersister,
@@ -101,6 +103,27 @@ function ThemedToaster() {
 
 function WatchlistAlertObserver() {
   useWatchlistAlerts();
+  return null;
+}
+
+/**
+ * Keeps `settingsStore` scoped to the connected wallet (#992).
+ *
+ * The settings store persists per-wallet buckets (`kora-settings-store-${address}`)
+ * but has no way to observe wallet changes on its own. Subscribing to the wallet
+ * store's address here means connect, disconnect and account-switch all re-key
+ * and rehydrate persistence without any settings surface needing to know.
+ */
+function SettingsWalletSync() {
+  const address = useWalletStore((s) => s.address);
+  const isConnected = useWalletStore((s) => s.isConnected);
+
+  useEffect(() => {
+    useSettingsStore
+      .getState()
+      .setActiveWallet(isConnected ? address : null);
+  }, [isConnected, address]);
+
   return null;
 }
 
@@ -185,6 +208,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <VerificationProvider>
           {children}
           {onboardingTourEnabled && <OnboardingTour />}
+          <SettingsWalletSync />
           <WalletConnectModal />
           <InProgressOverlay />
           <TransactionAnnouncer />

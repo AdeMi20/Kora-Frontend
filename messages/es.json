@@ -49,7 +49,12 @@
     "reconnect": "Reconectar Billetera",
     "reconnecting": "Reconectando...",
     "restoringSession": "Restaurando sesión de billetera...",
-    "balanceLoadFailed": "No se pudieron cargar los saldos"
+    "balanceLoadFailed": "No se pudieron cargar los saldos",
+    "walletConnected": "Billetera conectada",
+    "redirecting": "Te estamos llevando a tu panel…",
+    "mobileApp": "Aplicación móvil",
+    "openInApp": "Abrir en la aplicación",
+    "deepLinkWaiting": "Esperando a que se abra la aplicación de billetera…"
   },
   "transaction": {
     "building": "Construyendo transacción…",
@@ -301,7 +306,15 @@
     },
     "hint": {
       "minRemaining": "Mín: ${min} · Capacidad Restante: ${remaining}"
-    }
+    },
+    "ipfsLoadingPreview": "Cargando vista previa del documento…",
+    "ipfsRetry": "Reintentar",
+    "ipfsOpenInNewTab": "Abrir en una pestaña nueva",
+    "ipfsErrorTitle": "Vista previa del documento no disponible",
+    "ipfsErrorDesc": "La puerta de enlace IPFS no respondió a tiempo. Puedes reintentar o abrir el documento directamente.",
+    "ipfsOfflineTitle": "Estás sin conexión",
+    "ipfsOfflineDesc": "La vista previa del documento requiere conexión a internet.",
+    "ipfsDownloadPdf": "Descargar PDF"
   },
   "createInvoice": {
     "title": "Crear Factura",
@@ -841,7 +854,14 @@
     "statusSuccess": "Enviado",
     "statusError": "Fallido",
     "statusPending": "En cola",
-    "badgeAriaLabel": "{count} transacción(es) pendiente(s)"
+    "badgeAriaLabel": "{count} transacción(es) pendiente(s)",
+    "statusExhausted": "Se alcanzó el número máximo de reintentos",
+    "retryIn": "Reintentando en {seconds}s",
+    "retryExhausted": "Se alcanzó el máximo de reintentos",
+    "retryExhaustedDesc": "Esta transacción no pudo enviarse tras 5 intentos. Copia el XDR firmado para reenviarlo manualmente, o descártalo.",
+    "copyXdrAriaLabel": "Copiar XDR firmado al portapapeles",
+    "xdrCopied": "XDR firmado copiado al portapapeles",
+    "xdrCopyFailed": "No se pudo copiar el XDR"
   },
   "notFound": {
     "title": "Página no encontrada",
@@ -1485,6 +1505,24 @@
       "title": "La verificación falló",
       "body": "Synaps no pudo verificar tu documento automáticamente. Asegúrate de que la imagen del documento sea nítida, no esté recortada y todos los datos sean visibles.",
       "retry": "Intentar de nuevo"
+    }
+  },
+  "pwa": {
+    "manifest": {
+      "shortcuts": {
+        "marketplace": {
+          "shortName": "Mercado",
+          "description": "Explorar las facturas listadas"
+        },
+        "createInvoice": {
+          "shortName": "Crear",
+          "description": "Tokenizar una nueva factura"
+        }
+      },
+      "screenshots": {
+        "wide": "Mercado de Kora Protocol",
+        "narrow": "Kora Protocol en el móvil"
+      }
     }
   }
 }

@@ -4,7 +4,10 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   DEFAULT_TOUR_SETTINGS,
   DEFAULT_CONCENTRATION_SETTINGS,
+  SETTINGS_STORAGE_BASE_KEY,
   migrateLegacyNotificationPreferences,
+  normalizeSettingsWalletAddress,
+  settingsStorageKey,
   LEGACY_UI_STORE_KEY,
   LEGACY_INVOICE_STORE_KEY,
 } from "../store/settingsStore";
@@ -22,6 +25,9 @@ function resetStore() {
     tour: { ...DEFAULT_TOUR_SETTINGS },
     concentration: { ...DEFAULT_CONCENTRATION_SETTINGS },
   });
+  // Wallet-scoped tests rotate the persist key; restore the disconnected
+  // bucket so tests cannot leak key state into one another.
+  useSettingsStore.persist.setOptions({ name: SETTINGS_STORAGE_BASE_KEY });
   localStorage.clear();
 }
 
@@ -399,6 +405,91 @@ describe("settingsStore — wallet scoping", () => {
     expect(useSettingsStore.getState().notificationsByWallet.GALICE.apr).toBe(true);
     expect(useSettingsStore.getState().notificationsByWallet.GBOB).toEqual(
       DEFAULT_NOTIFICATION_PREFS
+    );
+  });
+});
+
+describe("settingsStore — per-wallet persistence keys", () => {
+  beforeEach(resetStore);
+
+  it("uses the base key while disconnected", () => {
+    expect(settingsStorageKey(null)).toBe(SETTINGS_STORAGE_BASE_KEY);
+    expect(useSettingsStore.persist.getOptions().name).toBe(
+      SETTINGS_STORAGE_BASE_KEY
+    );
+  });
+
+  it("normalises address casing and whitespace into one bucket", () => {
+    expect(normalizeSettingsWalletAddress("galice")).toBe("GALICE");
+    expect(normalizeSettingsWalletAddress("  GALICE  ")).toBe("GALICE");
+    expect(normalizeSettingsWalletAddress("")).toBeNull();
+    expect(normalizeSettingsWalletAddress(undefined)).toBeNull();
+
+    expect(settingsStorageKey("galice")).toBe(
+      `${SETTINGS_STORAGE_BASE_KEY}-GALICE`
+    );
+    expect(settingsStorageKey("GALICE")).toBe(settingsStorageKey("galice"));
+  });
+
+  it("rotates the persist key to the connected wallet", () => {
+    useSettingsStore.getState().setActiveWallet("galice");
+
+    expect(useSettingsStore.getState().activeWallet).toBe("GALICE");
+    expect(useSettingsStore.persist.getOptions().name).toBe(
+      `${SETTINGS_STORAGE_BASE_KEY}-GALICE`
+    );
+  });
+
+  it("writes edits into the active wallet's bucket", () => {
+    useSettingsStore.getState().setActiveWallet("GALICE");
+    useSettingsStore.getState().setNotifications({ fundingAlerts: false });
+
+    const bucket = localStorage.getItem(
+      `${SETTINGS_STORAGE_BASE_KEY}-GALICE`
+    );
+    expect(bucket).toBeTruthy();
+    expect(JSON.parse(bucket!).state.notifications.fundingAlerts).toBe(false);
+  });
+
+  it("keeps two wallets' buckets independent", () => {
+    useSettingsStore.getState().setActiveWallet("GALICE");
+    useSettingsStore.getState().setNotifications({ fundingAlerts: false, apr: true });
+
+    useSettingsStore.getState().setActiveWallet("GBOB");
+    useSettingsStore.getState().setNotifications({ fundingAlerts: true, apr: false });
+
+    const alice = JSON.parse(
+      localStorage.getItem(`${SETTINGS_STORAGE_BASE_KEY}-GALICE`)!
+    );
+    const bob = JSON.parse(
+      localStorage.getItem(`${SETTINGS_STORAGE_BASE_KEY}-GBOB`)!
+    );
+
+    expect(alice.state.notifications.fundingAlerts).toBe(false);
+    expect(alice.state.notifications.apr).toBe(true);
+    expect(bob.state.notifications.fundingAlerts).toBe(true);
+    expect(bob.state.notifications.apr).toBe(false);
+  });
+
+  it("rotates back to a known wallet's key on reconnect", () => {
+    useSettingsStore.getState().setActiveWallet("GALICE");
+    useSettingsStore.getState().setNotifications({ apr: true });
+    useSettingsStore.getState().setActiveWallet("GBOB");
+    useSettingsStore.getState().setActiveWallet("GALICE");
+
+    expect(useSettingsStore.getState().activeWallet).toBe("GALICE");
+    expect(useSettingsStore.persist.getOptions().name).toBe(
+      `${SETTINGS_STORAGE_BASE_KEY}-GALICE`
+    );
+  });
+
+  it("keeps the wallet key on disconnect — no reset, no leak", () => {
+    useSettingsStore.getState().setActiveWallet("GALICE");
+    useSettingsStore.getState().setActiveWallet(null);
+
+    expect(useSettingsStore.getState().activeWallet).toBe("GALICE");
+    expect(useSettingsStore.persist.getOptions().name).toBe(
+      `${SETTINGS_STORAGE_BASE_KEY}-GALICE`
     );
   });
 });
