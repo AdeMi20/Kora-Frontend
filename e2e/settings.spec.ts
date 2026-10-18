@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-import { installMockWallet, connectMockWallet } from "./helpers/mock-wallet";
+import { installMockWallet, connectMockWallet, MOCK_ADDRESS } from "./helpers/mock-wallet";
 
 test.describe("settings page", () => {
   test.beforeEach(async ({ page }) => {
@@ -52,5 +52,33 @@ test.describe("settings page", () => {
       "aria-checked",
       toggled as string,
     );
+  });
+
+  test("scopes persistence to the connected wallet's bucket", async ({ page }) => {
+    await connectMockWallet(page);
+    await page.goto("/settings");
+
+    const toggle = page.getByRole("switch").first();
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+
+    // The persist key rotates to kora-settings-store-${address} on connect, so
+    // the wallet's profile lives in its own bucket...
+    const bucket = await page.evaluate(
+      (address) => localStorage.getItem(`kora-settings-store-${address}`),
+      MOCK_ADDRESS,
+    );
+    expect(bucket).toBeTruthy();
+    const walletState = JSON.parse(bucket as string).state;
+    expect(walletState.notifications).toBeTruthy();
+
+    // ...and the shared/disconnected bucket never persists the cross-wallet
+    // snapshot map, so one profile's preferences cannot linger for the next.
+    const shared = await page.evaluate(() =>
+      localStorage.getItem("kora-settings-store"),
+    );
+    if (shared) {
+      expect(JSON.parse(shared).state.notificationsByWallet).toBeUndefined();
+    }
   });
 });

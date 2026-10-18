@@ -10,12 +10,17 @@
  * This store is now the single source of truth. The deprecated setter shims in
  * `uiStore`/`invoiceStore` forward here, and the legacy persisted payloads are
  * folded in once via `onRehydrateStorage` so existing users keep their choices.
+ *
+ * Persistence is scoped per connected wallet: the persist key rotates to
+ * `kora-settings-store-${address}` (see `settingsStorageKey`) when a wallet
+ * connects, so two profiles sharing a browser never read each other's
+ * thresholds. The `notificationsByWallet` map keeps in-session snapshots for
+ * instant switching; the per-wallet storage buckets survive reloads.
  */
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
   safeStorageGetItem,
-  safeStorageRemoveItem,
   safeStorageSetItem,
 } from "./storageAdapter";
 
@@ -25,7 +30,6 @@ import {
   type ConcentrationThresholds,
   type SnoozeEntry,
 } from "@/lib/concentrationRisk";
-import { safeStorageGetItem, safeStorageSetItem } from "./storageAdapter";
 
 export type MaturityReminderDays = 1 | 3 | 7;
 export type Persona = "investor" | "sme";
@@ -79,6 +83,67 @@ export const DEFAULT_TOUR_SETTINGS: TourSettings = {
 };
 
 const TOUR_STORAGE_KEY = "kora-tour-done";
+
+// ── Per-wallet persistence keying ────────────────────────────────────────────
+
+/**
+ * Base persist key. When a wallet is connected the key becomes
+ * `kora-settings-store-${normalizedAddress}` so notification/tour/concentration
+ * settings never bleed between profiles on a shared browser.
+ */
+export const SETTINGS_STORAGE_BASE_KEY = "kora-settings-store";
+
+/**
+ * Normalise a wallet address for use as a storage-key suffix. Stellar
+ * addresses are uppercase base32, but pasted/derived values may arrive in
+ * lowercase; casing them consistently stops the same wallet from producing two
+ * buckets (the "address case sensitivity" edge case).
+ */
+export function normalizeSettingsWalletAddress(
+  address?: string | null
+): string | null {
+  const trimmed = address?.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+/**
+ * Storage key for a wallet (or the disconnected bucket when `address` is
+ * nullish). Exported so tests and consumers share one definition.
+ */
+export function settingsStorageKey(address?: string | null): string {
+  const normalized = normalizeSettingsWalletAddress(address);
+  return normalized
+    ? `${SETTINGS_STORAGE_BASE_KEY}-${normalized}`
+    : SETTINGS_STORAGE_BASE_KEY;
+}
+
+/** The subset of store state that is persisted per wallet (see `partialize`). */
+interface PersistedWalletSettings {
+  notifications?: NotificationPrefs;
+  tour?: TourSettings;
+  concentration?: ConcentrationSettings;
+  notificationsMigrated?: boolean;
+}
+
+/**
+ * Read a wallet's persisted settings straight from storage without triggering a
+ * rehydrate. Used by `setActiveWallet` to load the incoming bucket before the
+ * state write, so switching wallets cannot overwrite the bucket it is reading.
+ * Returns `null` when the wallet has never persisted anything.
+ */
+export function readPersistedWalletSettings(
+  address: string,
+  readItem: (key: string) => string | null = safeStorageGetItem
+): PersistedWalletSettings | null {
+  const raw = readItem(settingsStorageKey(address));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { state?: PersistedWalletSettings };
+    return parsed?.state ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Legacy notification preference migration ─────────────────────────────────
 
@@ -233,27 +298,59 @@ export const useSettingsStore = create<SettingsStore>()(
        * wallet's choices into another. The first wallet to connect adopts the
        * already-loaded preferences, so connecting does not reset a user who had
        * configured things before scoping existed.
+       *
+       * The persist key rotates to the incoming wallet's bucket. Its stored
+       * settings (if any) are read *before* the state write so the write cannot
+       * clobber the bucket with the outgoing wallet's values — the write simply
+       * echoes back what was just read.
        */
-      setActiveWallet: (address) =>
-        set((s) => {
-          if (address === s.activeWallet) return {};
-          // Disconnecting keeps the last wallet's preferences loaded, so a
-          // simple reconnect is a no-op rather than a reset to defaults.
-          if (!address) return {};
+      setActiveWallet: (address) => {
+        const current = useSettingsStore.getState();
+        const next = normalizeSettingsWalletAddress(address);
+        // Disconnecting keeps the last wallet's preferences loaded, so a
+        // simple reconnect is a no-op rather than a reset to defaults.
+        if (!next || next === current.activeWallet) return;
 
-          const byWallet = s.activeWallet
-            ? { ...s.notificationsByWallet, [s.activeWallet]: s.notifications }
-            : { ...s.notificationsByWallet };
-          const notifications =
-            byWallet[address] ??
-            (s.activeWallet === null ? s.notifications : DEFAULT_NOTIFICATION_PREFS);
+        const byWallet = current.activeWallet
+          ? {
+              ...current.notificationsByWallet,
+              [current.activeWallet]: current.notifications,
+            }
+          : { ...current.notificationsByWallet };
 
-          return {
-            activeWallet: address,
-            notificationsByWallet: { ...byWallet, [address]: notifications },
-            notifications,
-          };
-        }),
+        const stored = readPersistedWalletSettings(next);
+
+        useSettingsStore.persist.setOptions({
+          name: settingsStorageKey(next),
+        });
+
+        if (stored) {
+          useSettingsStore.setState({
+            activeWallet: next,
+            notifications: stored.notifications ?? current.notifications,
+            tour: stored.tour ?? current.tour,
+            concentration: stored.concentration ?? current.concentration,
+            notificationsMigrated:
+              stored.notificationsMigrated ?? current.notificationsMigrated,
+            notificationsByWallet: stored.notifications
+              ? { ...byWallet, [next]: stored.notifications }
+              : byWallet,
+          });
+          return;
+        }
+
+        const notifications =
+          byWallet[next] ??
+          (current.activeWallet === null
+            ? current.notifications
+            : DEFAULT_NOTIFICATION_PREFS);
+
+        useSettingsStore.setState({
+          activeWallet: next,
+          notificationsByWallet: { ...byWallet, [next]: notifications },
+          notifications,
+        });
+      },
 
       setNotifications: (prefs) =>
         set((s) => {
@@ -351,7 +448,20 @@ export const useSettingsStore = create<SettingsStore>()(
       },
     }),
     {
-      name: "kora-settings-store",
+      name: settingsStorageKey(null),
+      /**
+       * Persist only the user-facing settings. `activeWallet` and
+       * `notificationsByWallet` are session state — the per-wallet buckets are
+       * the durable store, and writing the cross-wallet snapshot map into the
+       * (shared) disconnected bucket would leave another profile's preferences
+       * on disk for the next user of the browser.
+       */
+      partialize: (state) => ({
+        notifications: state.notifications,
+        tour: state.tour,
+        concentration: state.concentration,
+        notificationsMigrated: state.notificationsMigrated,
+      }),
       /**
        * One-time migration: pull the diverged notification preferences out of
        * the legacy `uiStore`/`invoiceStore` payloads the first time this store

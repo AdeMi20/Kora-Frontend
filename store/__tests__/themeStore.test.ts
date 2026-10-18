@@ -4,20 +4,23 @@
  * We test the pure state-transition logic directly without a DOM environment
  * (vitest is configured with environment: "node").
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  THEME_COLORS,
+  THEME_INIT_SCRIPT,
+  THEME_STORAGE_KEY,
+  applyBrowserThemeColor,
+  buildViewportThemeColor,
+  parseThemePreference,
+  readThemePreference,
+  resolveTheme,
+} from "@/lib/theme";
 
 // ─── resolveTheme ─────────────────────────────────────────────────────────────
 
-// Inline the pure logic so tests stay environment-agnostic.
-// The real resolveTheme in ThemeProvider.tsx has the identical implementation.
-function resolveTheme(
-  theme: "light" | "dark" | "system",
-  prefersDark: boolean
-): "light" | "dark" {
-  if (theme !== "system") return theme;
-  return prefersDark ? "dark" : "light";
-}
-
+// `resolveTheme` now lives in lib/theme and is shared by the inline bootstrap
+// script and ThemeProvider. The tests below were previously run against an
+// inlined copy of the same logic.
 describe("resolveTheme", () => {
   it('returns "dark" when theme is "dark"', () => {
     expect(resolveTheme("dark", false)).toBe("dark");
@@ -104,5 +107,158 @@ describe("localStorage persistence contract", () => {
     const parsed = JSON.parse(storageValue);
     const theme = parsed.state?.theme ?? "system";
     expect(theme).toBe("system");
+  });
+});
+
+// ─── shared helpers (issue #989) ──────────────────────────────────────────────
+
+describe("readThemePreference", () => {
+  it("reads state.theme from a persisted uiStore payload", () => {
+    const read = (key: string) =>
+      key === THEME_STORAGE_KEY
+        ? JSON.stringify({ state: { theme: "light" } })
+        : null;
+    expect(readThemePreference(read)).toBe("light");
+  });
+
+  it("returns 'system' for missing keys, corrupt JSON and unknown values", () => {
+    expect(readThemePreference(() => null)).toBe("system");
+    expect(readThemePreference(() => "{not json")).toBe("system");
+    expect(
+      readThemePreference(() => JSON.stringify({ state: { theme: "plaid" } }))
+    ).toBe("system");
+  });
+});
+
+describe("parseThemePreference", () => {
+  it("accepts only the three known preferences", () => {
+    expect(parseThemePreference("light")).toBe("light");
+    expect(parseThemePreference("dark")).toBe("dark");
+    expect(parseThemePreference("system")).toBe("system");
+    expect(parseThemePreference(undefined)).toBe("system");
+    expect(parseThemePreference(1)).toBe("system");
+  });
+});
+
+// ─── inline bootstrap script parity (issue #989) ──────────────────────────────
+
+describe("THEME_INIT_SCRIPT", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  function installMatchMedia(prefersDark: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: prefersDark,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  function runScript(): string {
+    document.documentElement.className = "";
+    // eslint-disable-next-line no-new-func
+    new Function(THEME_INIT_SCRIPT)();
+    return document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light";
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.className = "";
+    installMatchMedia(false);
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    localStorage.clear();
+    document.documentElement.className = "";
+  });
+
+  it("matches resolveTheme for every preference / OS combination", () => {
+    const preferences = ["light", "dark", "system"] as const;
+
+    for (const theme of preferences) {
+      for (const prefersDark of [true, false]) {
+        localStorage.setItem(
+          THEME_STORAGE_KEY,
+          JSON.stringify({ state: { theme } })
+        );
+        installMatchMedia(prefersDark);
+        expect(runScript()).toBe(resolveTheme(theme, prefersDark));
+      }
+    }
+  });
+
+  it("defaults to dark when storage is unreadable", () => {
+    const spy = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    installMatchMedia(false);
+    expect(runScript()).toBe("dark");
+    spy.mockRestore();
+  });
+
+  it("treats an absent payload as the system preference", () => {
+    installMatchMedia(true);
+    expect(runScript()).toBe("dark");
+    installMatchMedia(false);
+    expect(runScript()).toBe("light");
+  });
+});
+
+// ─── browser chrome color (issue #990) ────────────────────────────────────────
+
+describe("viewport themeColor", () => {
+  it("exposes a light and dark token with media queries", () => {
+    const entries = buildViewportThemeColor();
+    expect(entries).toEqual([
+      { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+      { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+    ]);
+  });
+
+  it("uses non-teal zinc surfaces as the chrome colors", () => {
+    expect(THEME_COLORS.light).toBe("#ffffff");
+    expect(THEME_COLORS.dark).toBe("#09090b");
+  });
+});
+
+describe("applyBrowserThemeColor", () => {
+  function mountMeta(media?: string) {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    if (media) meta.setAttribute("media", media);
+    document.head.appendChild(meta);
+    return meta;
+  }
+
+  beforeEach(() => {
+    document.head
+      .querySelectorAll('meta[name="theme-color"]')
+      .forEach((node) => node.remove());
+  });
+
+  it("forces the resolved color onto every theme-color tag", () => {
+    const light = mountMeta("(prefers-color-scheme: light)");
+    const dark = mountMeta("(prefers-color-scheme: dark)");
+
+    applyBrowserThemeColor("light");
+
+    for (const meta of [light, dark]) {
+      expect(meta.getAttribute("content")).toBe(THEME_COLORS.light);
+      expect(meta.hasAttribute("media")).toBe(false);
+    }
+
+    applyBrowserThemeColor("dark");
+    for (const meta of [light, dark]) {
+      expect(meta.getAttribute("content")).toBe(THEME_COLORS.dark);
+    }
   });
 });

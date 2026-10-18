@@ -61,13 +61,25 @@ const withPWA = require("@ducanh2912/next-pwa").default({
         expiration: { maxEntries: 64, maxAgeSeconds: 24 * 60 * 60 },
       },
     },
-    // 5. Public static files (wallets, icons, fonts, manifest, og-image) — cache-first
+    // 5. Public static files (wallets, icons, fonts, og-image) — cache-first
     {
-      urlPattern: /^\/(?:icons|wallets|fonts|og-image\.png|manifest\.json|favicon\.ico).*/i,
+      urlPattern: /^\/(?:icons|wallets|fonts|og-image\.png|favicon\.ico).*/i,
       handler: "CacheFirst",
       options: {
         cacheName: "static-public-v1",
         expiration: { maxEntries: 64, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
+    // 5b. PWA manifest — now a locale-aware route (#988), so cache-first would
+    // pin the first locale's shortcuts for 30 days. Revalidate on every use and
+    // keep a short-lived cache so an offline install still resolves.
+    {
+      urlPattern: /^\/manifest\.json$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "pwa-manifest-v1",
+        expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },
