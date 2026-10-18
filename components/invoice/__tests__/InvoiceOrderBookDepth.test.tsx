@@ -92,4 +92,22 @@ describe("InvoiceOrderBookDepth store subscription", () => {
     expect(screen.getByText("empty.title")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
+
+  it("exposes depth bars as progressbars with valuenow/min/max", () => {
+    render(<InvoiceOrderBookDepth invoiceTokenId="42" />);
+
+    act(() => {
+      usePositionListingStore.getState().listPosition(listing("pos_a", 900));
+      usePositionListingStore.getState().listPosition(listing("pos_b", 950));
+    });
+
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(2);
+    for (const bar of bars) {
+      expect(bar).toHaveAttribute("aria-valuemin", "0");
+      expect(bar).toHaveAttribute("aria-valuemax", "100");
+      expect(Number(bar.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(0);
+      expect(Number(bar.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(100);
+    }
+  });
 });
