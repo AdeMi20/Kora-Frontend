@@ -7,6 +7,7 @@
  *
  * Note: single-instance in-memory store, same limitation as the existing
  * upload rate limiter — use a shared store (Redis) for multi-instance deploys.
+ * See docs/architecture.md#redis-migration-for-rate-limiting-and-shared-state.
  */
 
 const verifiedWallets = new Map<string, number>(); // walletAddress -> expiresAt (ms)
