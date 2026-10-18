@@ -142,9 +142,18 @@ export function InvoiceOrderBookDepth({
                 >
                   {/* Depth visualisation bar */}
                   <span
+                    role="progressbar"
+                    aria-valuenow={
+                      Math.round((row.cumulativeVolume / maxCumulative) * 100)
+                    }
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={t("depthProgress", {
+                      positionId: row.positionId,
+                      value: formatCurrency(row.cumulativeVolume, currency),
+                    })}
                     className="pointer-events-none absolute inset-y-0 left-0 bg-emerald-500/8 transition-[width]"
                     style={{ width: depthBarWidth }}
-                    aria-hidden
                   />
 
                   <span role="cell" className="relative font-semibold text-white">
