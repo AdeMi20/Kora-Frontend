@@ -3,6 +3,7 @@ import {
   parseWalletDiagnosticsImport,
   redactWalletAddress,
   sanitizeWalletDiagnosticsExport,
+  sanitizeQueryParam,
 } from "../security";
 
 describe("wallet diagnostics security helpers", () => {
@@ -41,3 +42,32 @@ describe("wallet diagnostics security helpers", () => {
     expect(imported.flags.enableDevtools).toBe(false);
   });
 });
+
+describe("sanitizeQueryParam fuzz (Issue #960)", () => {
+  it("rejects control characters and non-printable bytes", () => {
+    expect(sanitizeQueryParam("a\u0000b\u001fc")).toBe("abc");
+  });
+
+  it("rejects surrogate pairs and non-ASCII without throwing", () => {
+    expect(() => sanitizeQueryParam("filter\uD800\uDC00")).not.toThrow();
+    expect(sanitizeQueryParam("filter\uD800\uDC00")).toBe("filter");
+  });
+
+  it("enforces the 256-char maximum length", () => {
+    const long = "a".repeat(500);
+    expect(sanitizeQueryParam(long).length).toBe(256);
+  });
+
+  it("returns empty for null/undefined/empty input", () => {
+    expect(sanitizeQueryParam(null)).toBe("");
+    expect(sanitizeQueryParam(undefined)).toBe("");
+    expect(sanitizeQueryParam("")).toBe("");
+  });
+
+  it("preserves printable ASCII query values", () => {
+    expect(sanitizeQueryParam("status=open&type=invoice")).toBe(
+      "status=open&type=invoice"
+    );
+  });
+});
+
