@@ -90,4 +90,37 @@ describe("POST /api/feedback (Issue #926)", () => {
     expect(body.title).toBe("[FEATURE] Add feature");
     expect(body.labels).toEqual(["enhancement"]);
   });
+
+  it("rejects a screenshot with a non-image MIME type", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "token";
+    process.env.GITHUB_FEEDBACK_REPO = "org/repo";
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        title: "t",
+        description: "d",
+        screenshot: "data:application/pdf;base64,abc",
+        context: { url: "/", walletAddress: null, userAgent: "ua", timestamp: "t" },
+      }) as any,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("PNG, JPEG or WEBP");
+  });
+
+  it("rejects an oversized screenshot", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "token";
+    process.env.GITHUB_FEEDBACK_REPO = "org/repo";
+    const huge = "a".repeat(3_000_000); // ~2.25 MiB decoded
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        title: "t",
+        description: "d",
+        screenshot: `data:image/png;base64,${huge}`,
+        context: { url: "/", walletAddress: null, userAgent: "ua", timestamp: "t" },
+      }) as any,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("2 MiB");
+  });
 });
