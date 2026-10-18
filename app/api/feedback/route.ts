@@ -44,6 +44,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Invalid feedback type", requestId }, { status: 400 });
     }
 
+    // ── Screenshot validation (Issue #959) ────────────────────────────────
+    const MAX_SCREENSHOT_BYTES = 2 * 1024 * 1024; // 2 MiB
+    const ALLOWED_SCREENSHOT_MIME = ["image/png", "image/jpeg", "image/webp"];
+    if (body.screenshot) {
+      const mimeMatch = body.screenshot.match(/^data:([^/]+\/[^;]+);/);
+      const mime = mimeMatch?.[1];
+      if (!mime || !ALLOWED_SCREENSHOT_MIME.includes(mime)) {
+        return NextResponse.json(
+          { error: "Screenshot must be a PNG, JPEG or WEBP image", requestId },
+          { status: 400 }
+        );
+      }
+      const base64 = body.screenshot.split(",")[1] ?? "";
+      const approxBytes = Math.floor((base64.length * 3) / 4);
+      if (approxBytes > MAX_SCREENSHOT_BYTES) {
+        return NextResponse.json(
+          { error: "Screenshot exceeds the 2 MiB size limit", requestId },
+          { status: 400 }
+        );
+      }
+    }
+
     // ── Console log (always) ──────────────────────────────────────────────────
     logger.info("Feedback received", {
       requestId,
