@@ -73,6 +73,22 @@ test.describe("Accessibility audit — marketplace (/marketplace)", () => {
       disableRules: [],
     });
   });
+
+  test("no critical or serious axe violations under Arabic (RTL) locale", async ({
+    page,
+  }) => {
+    await page.goto("/marketplace", {
+      headers: { "accept-language": "ar" },
+    });
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => {
+      document.documentElement.lang = "ar";
+      document.documentElement.dir = "rtl";
+    });
+    await auditPage(page, {
+      disableRules: [],
+    });
+  });
 });
 
 test.describe("Accessibility audit — invoice detail (/marketplace/:id)", () => {
