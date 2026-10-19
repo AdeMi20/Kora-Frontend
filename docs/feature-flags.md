@@ -115,8 +115,29 @@ in the current build.
 | `onboarding-tour`           | `components/onboarding/OnboardingTour.tsx`, `app/providers.tsx`                                                                     |
 | `batch-actions`             | `app/dashboard/sme/page.tsx`                                                                                                        |
 | `kyb-mint-gate`             | `app/invoice/create/page.tsx`                                                                                                       |
-| `secondary-market`          | `components/layout/Navbar.tsx`                                                                                                      |
+| `secondary-market`          | `components/layout/Navbar.tsx`, `app/secondary/page.tsx`, `app/secondary/metadata.ts` (server), `app/sitemap.xml/route.ts` (server) |
 | `category-taxonomy-preview` | `components/marketplace/CategoryTaxonomyPreview.tsx`                                                                                |
+
+## Server-side flag reads (SEO)
+
+`lib/featureFlags.ts` imports React hooks, so server layouts and route handlers
+must not import it. Server code reads flags through
+[`lib/serverFeatureFlags.ts`](../lib/serverFeatureFlags.ts), which mirrors the
+`FLAG_ENV_MAP` env var and its `"true"`-only semantics. The runtime override
+panel (localStorage) is **not** visible on the server — SEO output follows the
+deployment env only, so a flag enabled in staging env advertises the route in
+staging only.
+
+### `secondary-market` (#1000, #1002)
+
+| Surface                                             | Flag on                                                                                  | Flag off                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `/secondary` head (`app/secondary/metadata.ts`)     | Title, description, Open Graph + Twitter card, canonical + hreflang, `index, follow`      | Title only, `noindex, nofollow`, no OG/Twitter tags  |
+| `/sitemap.xml` (`app/sitemap.xml/route.ts`)         | Emits `/secondary` with `changefreq: hourly`, `priority: 0.7`                            | `/secondary` omitted (avoids crawls of a disabled route) |
+
+The sitemap evaluates the flag on every request (it is a dynamic route handler
+with a 1h `Cache-Control`), so flipping the env and redeploying/restarting is
+enough — no manual sitemap edits per release.
 
 ## Adding a new flag
 
