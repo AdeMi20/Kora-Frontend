@@ -17,6 +17,7 @@ describe("FeatureFlagPanel", () => {
   afterEach(() => {
     process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS = originalDevtoolsEnv;
     window.localStorage.clear();
+    vi.unstubAllEnvs();
   });
 
   function renderPanel() {
@@ -60,6 +61,7 @@ describe("FeatureFlagPanel", () => {
   });
 
   it("invalidates invoice queries when mock-data is toggled", async () => {
+    vi.stubEnv("NODE_ENV", "development");
     const user = userEvent.setup();
     const { invalidateQueries } = renderPanel();
 
@@ -88,5 +90,62 @@ describe("FeatureFlagPanel", () => {
     );
 
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  describe("restricted overrides outside development (Issue #1025)", () => {
+    beforeEach(() => {
+      vi.stubEnv("NODE_ENV", "test");
+    });
+
+    it.each(["mock-data", "secondary-market"])(
+      "disables the %s toggle and explains why",
+      (flag) => {
+        renderPanel();
+
+        const toggle = screen.getByRole("checkbox", {
+          name: new RegExp(`toggle ${flag}`, "i"),
+        });
+        expect(toggle).toBeDisabled();
+        expect(toggle).toHaveAccessibleDescription(
+          /disabled outside local development/i,
+        );
+      },
+    );
+
+    it("does not persist an override when a locked toggle is clicked", async () => {
+      const user = userEvent.setup();
+      const { invalidateQueries } = renderPanel();
+
+      await user.click(
+        screen.getByRole("checkbox", { name: /toggle mock-data/i }),
+      );
+
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+      expect(invalidateQueries).not.toHaveBeenCalled();
+    });
+
+    it("keeps non-restricted flags toggleable", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      const toggle = screen.getByRole("checkbox", { name: /toggle comparison/i });
+      expect(toggle).toBeEnabled();
+      await user.click(toggle);
+      expect(window.localStorage.getItem(STORAGE_KEY)).toContain(
+        '"comparison":true',
+      );
+    });
+
+    it("leaves restricted toggles enabled in development", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      renderPanel();
+
+      expect(
+        screen.getByRole("checkbox", { name: /toggle mock-data/i }),
+      ).toBeEnabled();
+      expect(
+        screen.getByRole("checkbox", { name: /toggle secondary-market/i }),
+      ).toBeEnabled();
+    });
   });
 });

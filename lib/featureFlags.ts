@@ -52,6 +52,20 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
 export type FeatureFlagState = Record<FeatureFlag, boolean>;
 export type FeatureFlagOverrides = Partial<Record<FeatureFlag, boolean>>;
 
+/**
+ * Flags whose runtime (localStorage) overrides are blocked outside
+ * `NODE_ENV === "development"` — Issue #1025.
+ *
+ * Toggling these on a shared staging host flips the app between live and
+ * demo behaviour (mock fixtures, P2P trading route), which is easy to confuse
+ * during external demos. Outside local development they always resolve from
+ * their env var; stored overrides are ignored on read and dropped on write.
+ */
+export const DISALLOWED_OVERRIDE_FLAGS: readonly FeatureFlag[] = [
+  "mock-data",
+  "secondary-market",
+];
+
 const FEATURE_FLAG_OVERRIDE_STORAGE_KEY = "kora:feature-flag-overrides";
 const FEATURE_FLAG_CHANGE_EVENT = "kora:feature-flags-changed";
 
@@ -81,6 +95,16 @@ function canUseRuntimeOverrides(): boolean {
   return typeof window !== "undefined" && process.env.NODE_ENV !== "production";
 }
 
+/**
+ * Whether a runtime override may be applied to `flag` in the current build.
+ * Every flag is overridable in development; DISALLOWED_OVERRIDE_FLAGS are
+ * locked to their env value everywhere else (staging, test, production).
+ */
+export function isFlagOverrideAllowed(flag: FeatureFlag): boolean {
+  if (process.env.NODE_ENV === "development") return true;
+  return !DISALLOWED_OVERRIDE_FLAGS.includes(flag);
+}
+
 function parseOverrides(raw: string | null): FeatureFlagOverrides {
   if (!raw) return {};
 
@@ -89,6 +113,8 @@ function parseOverrides(raw: string | null): FeatureFlagOverrides {
     const overrides: FeatureFlagOverrides = {};
 
     for (const flag of FEATURE_FLAGS) {
+      // Ignore disallowed keys even if localStorage was edited by hand.
+      if (!isFlagOverrideAllowed(flag)) continue;
       if (typeof parsed[flag] === "boolean") {
         overrides[flag] = parsed[flag];
       }
@@ -137,6 +163,10 @@ function subscribeToFeatureFlags(onStoreChange: () => void): () => void {
 
 function writeOverrides(overrides: FeatureFlagOverrides): void {
   if (!canUseRuntimeOverrides()) return;
+
+  for (const flag of Object.keys(overrides) as FeatureFlag[]) {
+    if (!isFlagOverrideAllowed(flag)) delete overrides[flag];
+  }
 
   if (Object.keys(overrides).length === 0) {
     window.localStorage.removeItem(FEATURE_FLAG_OVERRIDE_STORAGE_KEY);
@@ -187,6 +217,8 @@ export function setFeatureFlagOverride(
   flag: FeatureFlag,
   enabled: boolean | undefined,
 ): void {
+  if (!isFlagOverrideAllowed(flag)) return;
+
   const overrides = readStoredOverrides();
 
   if (enabled === undefined) {
