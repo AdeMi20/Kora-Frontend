@@ -20,6 +20,10 @@ vi.mock("@/hooks/useNetworkStatus", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useToast", () => ({
+  useToast: () => ({ error: vi.fn(), dismiss: vi.fn() }),
+}));
+
 vi.mock("@/lib/xdrDraftQueue", () => ({
   listQueuedXdrDrafts: vi.fn().mockResolvedValue([{ id: "draft-1" }, { id: "draft-2" }]),
   flushQueuedXdrDrafts: vi.fn(),

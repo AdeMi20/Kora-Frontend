@@ -816,7 +816,10 @@
     "error": "خطأ",
     "rpcDown": "تعطل RPC",
     "rpcDegraded": "RPC متدهور",
-    "statusAriaLabel": "حالة الشبكة: {status} على {network}"
+    "statusAriaLabel": "حالة الشبكة: {status} على {network}",
+    "horizonDegradedToast": "استجابة Horizon بطيئة",
+    "horizonDownToast": "Horizon غير متاح",
+    "horizonToastHint": "قد تكون الأرصدة وسجل المعاملات غير محدّثة. يرجى المحاولة مرة أخرى بعد بضع دقائق."
   },
   "offline": {
     "title": "أنت غير متصل بالإنترنت",

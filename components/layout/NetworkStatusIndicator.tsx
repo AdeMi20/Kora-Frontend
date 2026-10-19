@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useNetworkStatus, type NetworkStatus } from "@/hooks/useNetworkStatus";
+import { useHorizonHealthToast } from "@/hooks/useHorizonHealthToast";
 import { StaleDataBadge } from "@/components/layout/StaleDataBadge";
 import { TooltipRoot, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getLatestMarketplaceDataUpdatedAt } from "@/lib/queryPersistence";
@@ -21,7 +22,8 @@ const STATUS_COLOR: Record<NetworkStatus, string> = {
 export function NetworkStatusIndicator() {
   const t = useTranslations("network");
   const queryClient = useQueryClient();
-  const { health, isOnline } = useNetworkStatus();
+  const { health, isOnline, refresh } = useNetworkStatus();
+  useHorizonHealthToast(health.horizon.status, isOnline, refresh);
   const [latestMarketplaceUpdatedAt, setLatestMarketplaceUpdatedAt] = useState<number | null>(() =>
     getLatestMarketplaceDataUpdatedAt(queryClient),
   );
