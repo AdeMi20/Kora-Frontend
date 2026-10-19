@@ -151,7 +151,19 @@ export function faqSchema() {
 
 // ─── Serializer helper ────────────────────────────────────────────────────────
 
-/** Serialize a schema object to a safe JSON string for injection into <script>. */
+/**
+ * Serialize a schema object to a safe JSON string for injection into <script>.
+ *
+ * `<`, `>` and `&` are emitted as JSON unicode escapes so a value such as
+ * `</script><script>…` cannot terminate the JSON-LD block, and U+2028/U+2029
+ * are escaped because they are line terminators in older JS parsers. The
+ * output is still valid JSON and round-trips through `JSON.parse`.
+ */
 export function serializeSchema(schema: object): string {
-  return JSON.stringify(schema);
+  return JSON.stringify(schema)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/ /g, "\\u2028")
+    .replace(/ /g, "\\u2029");
 }

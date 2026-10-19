@@ -1527,5 +1527,25 @@
         "narrow": "Kora Protocol على الجوال"
       }
     }
+  },
+  "metadata": {
+    "investorDashboard": {
+      "title": "لوحة المستثمر",
+      "description": "تابع محفظة تمويل الفواتير الخاصة بك. راقب المراكز النشطة والعائد المتوقع وجداول السداد لجميع استثماراتك في Kora Protocol.",
+      "ogDescription": "تابع محفظة تمويل الفواتير — المراكز النشطة والعائد وجداول السداد.",
+      "ogImageAlt": "لوحة المستثمر في Kora Protocol"
+    },
+    "smeDashboard": {
+      "title": "لوحة الشركات الصغيرة والمتوسطة",
+      "description": "أدر فواتيرك المرمّزة. تابع تقدّم التمويل وراقب جداول السداد واحصل على سيولة فورية بعملة USDC لأعمالك.",
+      "ogDescription": "أدر فواتيرك المرمّزة وتابع تقدّم التمويل على Kora Protocol.",
+      "ogImageAlt": "لوحة الشركات الصغيرة والمتوسطة في Kora Protocol"
+    },
+    "settings": {
+      "title": "الإعدادات",
+      "description": "إدارة تفضيلات الإشعارات والملف الشخصي وإعدادات جولة المنتج في Kora Protocol.",
+      "ogDescription": "إدارة تفضيلات الإشعارات وجولة المنتج على Kora Protocol.",
+      "ogImageAlt": "إعدادات Kora Protocol"
+    }
   }
 }
