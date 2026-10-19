@@ -1524,5 +1524,25 @@
         "narrow": "Kora Protocol on Mobile"
       }
     }
+  },
+  "metadata": {
+    "investorDashboard": {
+      "title": "Investor Dashboard",
+      "description": "Track your invoice financing portfolio. Monitor active positions, expected yield, and repayment schedules across all your Kora Protocol investments.",
+      "ogDescription": "Track your invoice financing portfolio — active positions, yield, and repayment schedules.",
+      "ogImageAlt": "Kora Protocol Investor Dashboard"
+    },
+    "smeDashboard": {
+      "title": "SME Dashboard",
+      "description": "Manage your tokenized invoices. Track funding progress, monitor repayment schedules, and access instant USDC liquidity for your business.",
+      "ogDescription": "Manage your tokenized invoices and track funding progress on Kora Protocol.",
+      "ogImageAlt": "Kora Protocol SME Dashboard"
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Manage your Kora Protocol notification preferences, persona, and product tour settings.",
+      "ogDescription": "Manage notification preferences and product tour settings on Kora Protocol.",
+      "ogImageAlt": "Kora Protocol Settings"
+    }
   }
 }
