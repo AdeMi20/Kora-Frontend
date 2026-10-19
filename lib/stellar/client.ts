@@ -4,6 +4,7 @@
  */
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import type {
   AccountBalances,
   AccountTransaction,
@@ -131,9 +132,21 @@ export class HorizonNetworkError extends Error {
   }
 }
 
-// ─── Internal error normaliser ────────────────────────────────────────────────
+// ─── Horizon error normaliser ─────────────────────────────────────────────────
 
-function normaliseHorizonError(err: unknown, address?: string): never {
+/**
+ * Maps any Horizon failure onto one of the typed errors above so hooks can
+ * render stable messages:
+ *
+ * - HTTP 404            → `AccountNotFoundError`
+ * - HTTP 429            → `HorizonRateLimitError`
+ * - other HTTP status   → `HorizonNetworkError("HTTP <status>: …")`
+ * - no response (offline, DNS, CORS, non-Error throws) → `HorizonNetworkError`
+ *
+ * Exported for unit tests (`lib/__tests__/stellar-client-horizon.test.ts`);
+ * app code should rely on the public helpers that call it.
+ */
+export function normaliseHorizonError(err: unknown, address?: string): never {
   if (err instanceof Error) {
     // Horizon SDK wraps HTTP errors — check the response status
     const anyErr = err as { response?: { status?: number } };
@@ -146,13 +159,164 @@ function normaliseHorizonError(err: unknown, address?: string): never {
   throw new HorizonNetworkError(String(err));
 }
 
+// ─── Horizon 429 retry policy ─────────────────────────────────────────────────
+//
+// Bursty dashboard polling can trip Horizon's per-IP rate limit. Read-only
+// Horizon calls are wrapped in `withHorizonRetry`, which retries ONLY on
+// HTTP 429 with exponential backoff + jitter, honours `Retry-After` (or
+// `X-Ratelimit-Reset`) when present, and gives up after a capped number of
+// attempts. Every other error fails fast. Never wrap non-idempotent writes
+// (transaction submission) — a retried submit could double-spend a sequence.
+
+export interface HorizonRetryOptions {
+  /** Total attempts including the first call. */
+  maxAttempts?: number;
+  /** Backoff base for the first retry; doubles on each subsequent retry. */
+  baseDelayMs?: number;
+  /** Upper bound for a computed backoff delay. */
+  maxDelayMs?: number;
+  /** Server-requested waits longer than this abort retrying instead. */
+  maxRetryAfterMs?: number;
+  /** Injectable for tests. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Injectable for tests; returns a value in [0, 1). */
+  random?: () => number;
+}
+
+export const HORIZON_RETRY_DEFAULTS = {
+  maxAttempts: 4,
+  baseDelayMs: 500,
+  maxDelayMs: 8_000,
+  maxRetryAfterMs: 30_000,
+} as const;
+
+/** Degraded-state warnings are logged at most once per this window. */
+export const HORIZON_DEGRADED_LOG_WINDOW_MS = 60_000;
+
+let lastDegradedLogAt = 0;
+/** Shared cooldown so concurrent callers back off together after a 429. */
+let horizonCooldownUntil = 0;
+
+/** Test-only: reset module-level retry state between tests. */
+export function __resetHorizonRetryState(): void {
+  lastDegradedLogAt = 0;
+  horizonCooldownUntil = 0;
+}
+
+type HorizonHttpError = {
+  response?: {
+    status?: number;
+    headers?: Record<string, string | undefined> | { get?: (name: string) => string | null };
+  };
+};
+
+function readHeader(err: unknown, name: string): string | undefined {
+  const headers = (err as HorizonHttpError)?.response?.headers;
+  if (!headers) return undefined;
+  if (typeof (headers as { get?: unknown }).get === "function") {
+    return (headers as { get: (n: string) => string | null }).get(name) ?? undefined;
+  }
+  const record = headers as Record<string, string | undefined>;
+  return record[name] ?? record[name.toLowerCase()];
+}
+
+/** True when the error is a Horizon HTTP 429 (raw SDK error or normalised). */
+export function isHorizonRateLimited(err: unknown): boolean {
+  if (err instanceof HorizonRateLimitError) return true;
+  return (err as HorizonHttpError)?.response?.status === 429;
+}
+
+/**
+ * Parse the server-requested wait from `Retry-After` (seconds or HTTP-date),
+ * falling back to Horizon's `X-Ratelimit-Reset` (seconds). Returns `null`
+ * when neither header is present or parseable.
+ */
+export function parseRetryAfterMs(err: unknown, now = Date.now()): number | null {
+  const retryAfter = readHeader(err, "retry-after");
+  if (retryAfter !== undefined && retryAfter.trim() !== "") {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+    const date = Date.parse(retryAfter);
+    if (!Number.isNaN(date)) return Math.max(0, date - now);
+  }
+  const reset = readHeader(err, "x-ratelimit-reset");
+  if (reset !== undefined) {
+    const seconds = Number(reset);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  }
+  return null;
+}
+
+/**
+ * Exponential backoff with "equal jitter": half the window is fixed, half is
+ * random, so concurrent callers spread out without ever retrying instantly.
+ */
+export function computeHorizonBackoffMs(
+  retry: number,
+  baseDelayMs: number = HORIZON_RETRY_DEFAULTS.baseDelayMs,
+  maxDelayMs: number = HORIZON_RETRY_DEFAULTS.maxDelayMs,
+  random: () => number = Math.random,
+): number {
+  const exp = Math.min(maxDelayMs, baseDelayMs * 2 ** retry);
+  return Math.round(exp / 2 + random() * (exp / 2));
+}
+
+function logHorizonDegraded(context: Record<string, unknown>): void {
+  const now = Date.now();
+  if (now - lastDegradedLogAt < HORIZON_DEGRADED_LOG_WINDOW_MS) return;
+  lastDegradedLogAt = now;
+  logger.warn("[horizon] rate limited (HTTP 429); backing off", context);
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Run an idempotent Horizon read, retrying on HTTP 429 only.
+ *
+ * Re-throws the last error unchanged so callers can still pass it through
+ * `normaliseHorizonError`.
+ */
+export async function withHorizonRetry<T>(
+  fn: () => Promise<T>,
+  options: HorizonRetryOptions = {},
+): Promise<T> {
+  const {
+    maxAttempts = HORIZON_RETRY_DEFAULTS.maxAttempts,
+    baseDelayMs = HORIZON_RETRY_DEFAULTS.baseDelayMs,
+    maxDelayMs = HORIZON_RETRY_DEFAULTS.maxDelayMs,
+    maxRetryAfterMs = HORIZON_RETRY_DEFAULTS.maxRetryAfterMs,
+    sleep = defaultSleep,
+    random = Math.random,
+  } = options;
+
+  for (let attempt = 1; ; attempt++) {
+    const cooldown = horizonCooldownUntil - Date.now();
+    if (cooldown > 0) await sleep(cooldown);
+
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isHorizonRateLimited(err) || attempt >= maxAttempts) throw err;
+
+      const backoff = computeHorizonBackoffMs(attempt - 1, baseDelayMs, maxDelayMs, random);
+      const retryAfter = parseRetryAfterMs(err);
+      if (retryAfter !== null && retryAfter > maxRetryAfterMs) throw err;
+
+      const delay = Math.max(backoff, retryAfter ?? 0);
+      horizonCooldownUntil = Math.max(horizonCooldownUntil, Date.now() + delay);
+
+      logHorizonDegraded({ attempt, maxAttempts, delayMs: delay, retryAfterMs: retryAfter });
+    }
+  }
+}
+
 // ─── Account helpers ──────────────────────────────────────────────────────────
 
 /**
  * Fetch raw account details from Horizon.
  */
 export async function getAccount(publicKey: string) {
-  return horizon.loadAccount(publicKey);
+  return withHorizonRetry(() => horizon.loadAccount(publicKey));
 }
 
 /**
@@ -167,9 +331,16 @@ export async function getAccount(publicKey: string) {
 export async function getAccountBalances(address: string): Promise<AccountBalances> {
   let account: Awaited<ReturnType<typeof horizon.loadAccount>>;
   try {
-    account = await horizon.loadAccount(address);
+    account = await withHorizonRetry(() => horizon.loadAccount(address));
   } catch (err) {
     normaliseHorizonError(err, address);
+  }
+
+  // Guard against proxies / misconfigured Horizon URLs returning a 200 with a
+  // body that is not an account record — surface it as a Horizon error rather
+  // than an opaque TypeError from iterating `undefined`.
+  if (!account || !Array.isArray(account.balances)) {
+    throw new HorizonNetworkError("malformed account response");
   }
 
   let xlm = "0";
@@ -221,7 +392,7 @@ export async function getUSDCBalance(address: string): Promise<number> {
  */
 export async function checkAccountExists(address: string): Promise<boolean> {
   try {
-    await horizon.loadAccount(address);
+    await withHorizonRetry(() => horizon.loadAccount(address));
     return true;
   } catch (err) {
     const anyErr = err as { response?: { status?: number } };
@@ -281,7 +452,7 @@ export async function getAccountTransactions(
 
   let page: Awaited<ReturnType<typeof builder.call>>;
   try {
-    page = await builder.call();
+    page = await withHorizonRetry(() => builder.call());
   } catch (err) {
     normaliseHorizonError(err, address);
   }
@@ -868,7 +1039,7 @@ export interface TransactionDetails {
  * Uses NEXT_PUBLIC_STELLAR_HORIZON_URL — no hardcoded URLs.
  */
 export async function fetchTransactionDetails(hash: string): Promise<TransactionDetails> {
-  const tx = await horizon.transactions().transaction(hash).call();
+  const tx = await withHorizonRetry(() => horizon.transactions().transaction(hash).call());
   return {
     hash: tx.hash,
     ledger: tx.ledger_attr,

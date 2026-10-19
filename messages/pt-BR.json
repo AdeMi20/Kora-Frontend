@@ -816,7 +816,10 @@
     "lastUpdated": "Last updated {time}",
     "rpcDown": "RPC Down",
     "rpcDegraded": "RPC Degraded",
-    "statusAriaLabel": "Network status: {status} on {network}"
+    "statusAriaLabel": "Network status: {status} on {network}",
+    "horizonDegradedToast": "O Horizon está respondendo lentamente",
+    "horizonDownToast": "O Horizon está indisponível",
+    "horizonToastHint": "Saldos e histórico de transações podem estar desatualizados. Tente novamente em alguns minutos."
   },
   "offline": {
     "title": "Você está offline",

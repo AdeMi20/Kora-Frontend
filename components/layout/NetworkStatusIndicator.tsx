@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useNetworkStatus, type NetworkStatus } from "@/hooks/useNetworkStatus";
+import { useHorizonHealthToast } from "@/hooks/useHorizonHealthToast";
 import { StaleDataBadge } from "@/components/layout/StaleDataBadge";
 import { TooltipRoot, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getLatestMarketplaceDataUpdatedAt } from "@/lib/queryPersistence";
@@ -11,6 +12,13 @@ import { listQueuedXdrDrafts } from "@/lib/xdrDraftQueue";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+
+/** Counts above this render as "99+" so the badge keeps its size. */
+export const QUEUE_BADGE_MAX = 99;
+
+function formatQueueCount(count: number): string {
+  return count > QUEUE_BADGE_MAX ? `${QUEUE_BADGE_MAX}+` : String(count);
+}
 
 const STATUS_COLOR: Record<NetworkStatus, string> = {
   operational: "bg-green-500",
@@ -21,7 +29,8 @@ const STATUS_COLOR: Record<NetworkStatus, string> = {
 export function NetworkStatusIndicator() {
   const t = useTranslations("network");
   const queryClient = useQueryClient();
-  const { health, isOnline } = useNetworkStatus();
+  const { health, isOnline, refresh } = useNetworkStatus();
+  useHorizonHealthToast(health.horizon.status, isOnline, refresh);
   const [latestMarketplaceUpdatedAt, setLatestMarketplaceUpdatedAt] = useState<number | null>(() =>
     getLatestMarketplaceDataUpdatedAt(queryClient),
   );
@@ -111,10 +120,14 @@ export function NetworkStatusIndicator() {
               {queueCount > 0 && (
                 <span
                   className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black"
-                  aria-label={`${queueCount} pending transaction(s)`}
+                  aria-label={
+                    queueCount === 1
+                      ? "1 pending transaction"
+                      : `${queueCount} pending transactions`
+                  }
                   data-testid="queue-badge"
                 >
-                  {queueCount}
+                  {formatQueueCount(queueCount)}
                 </span>
               )}
             </div>
@@ -159,7 +172,7 @@ export function NetworkStatusIndicator() {
                     data-testid="queue-tooltip-link"
                   >
                     <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
-                      {queueCount}
+                      {formatQueueCount(queueCount)}
                     </span>
                     {queueCount === 1
                       ? "1 signed transaction pending"

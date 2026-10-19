@@ -53,3 +53,102 @@ jobs:
           name: playwright-testnet-nightly-report
           path: playwright-report/
           retention-days: 30
+
+  # Real Freighter extension connect + sign (Issue #1027). Loads the unpacked
+  # extension into Chromium, imports a testnet-only wallet from a secret
+  # mnemonic, and signs a canned transaction that is never submitted.
+  # Skips cleanly (job stays green) when the mnemonic secret is absent.
+  freighter-extension-e2e:
+    name: Testnet real Freighter connect / sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUN_TESTNET_E2E: "false"
+      TESTNET_E2E_FREIGHTER_MNEMONIC: ${{ secrets.TESTNET_E2E_FREIGHTER_MNEMONIC }}
+      TESTNET_E2E_FREIGHTER_PUBLIC_KEY: ${{ secrets.TESTNET_E2E_FREIGHTER_PUBLIC_KEY }}
+      # Chrome Web Store id of Freighter; override the download URL with the
+      # FREIGHTER_CRX_URL repository variable to pin a specific build.
+      FREIGHTER_EXTENSION_ID: bcacfldlkkdogcmkkibnjlakofdplcbk
+      FREIGHTER_CRX_URL: ${{ vars.FREIGHTER_CRX_URL }}
+      FREIGHTER_EXTENSION_PATH: ${{ github.workspace }}/.freighter-extension
+      NEXT_PUBLIC_STELLAR_NETWORK: testnet
+      NEXT_PUBLIC_STELLAR_RPC_URL: https://soroban-testnet.stellar.org
+      NEXT_PUBLIC_STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      NEXT_PUBLIC_INVOICE_CONTRACT_ID: ${{ secrets.TESTNET_INVOICE_CONTRACT_ID }}
+      NEXT_PUBLIC_MARKETPLACE_CONTRACT_ID: ${{ secrets.TESTNET_MARKETPLACE_CONTRACT_ID }}
+      NEXT_PUBLIC_TOKEN_CONTRACT_ID: ${{ secrets.TESTNET_TOKEN_CONTRACT_ID }}
+      NEXT_PUBLIC_IPFS_GATEWAY: https://gateway.pinata.cloud/ipfs
+      NEXT_PUBLIC_ENABLE_MOCK_DATA: "false"
+      PINATA_JWT: ${{ secrets.PINATA_JWT }}
+    steps:
+      - name: Check required secrets
+        id: gate
+        run: |
+          if [ -z "$TESTNET_E2E_FREIGHTER_MNEMONIC" ]; then
+            echo "::notice::TESTNET_E2E_FREIGHTER_MNEMONIC is not configured — skipping real Freighter E2E."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout code
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.gate.outputs.enabled == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Download Freighter extension
+        id: extension
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          url="${FREIGHTER_CRX_URL:-https://clients2.google.com/service/update2/crx?response=redirect&prodversion=126.0&acceptformat=crx2,crx3&x=id%3D${FREIGHTER_EXTENSION_ID}%26uc}"
+          mkdir -p "$FREIGHTER_EXTENSION_PATH"
+          if curl -fsSL --retry 3 --max-time 120 -o freighter.crx "$url"; then
+            # A CRX is a zip with a signed header; unzip warns about the
+            # header and exits 1, so verify the manifest instead.
+            unzip -o -q freighter.crx -d "$FREIGHTER_EXTENSION_PATH" || true
+          fi
+          if [ -f "$FREIGHTER_EXTENSION_PATH/manifest.json" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Freighter extension could not be downloaded — the spec will skip."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build app
+        if: steps.gate.outputs.enabled == 'true' && steps.extension.outputs.available == 'true'
+        run: npm run build
+
+      - name: Run real Freighter E2E (connect + sign)
+        if: steps.gate.outputs.enabled == 'true' && steps.extension.outputs.available == 'true'
+        env:
+          RUN_FREIGHTER_E2E: "true"
+        # Extensions need a headed Chromium; xvfb provides the display.
+        run: >-
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24"
+          npx playwright test e2e/testnet-nightly.spec.ts --project=chromium
+          --grep @freighter --trace retain-on-failure
+
+      - name: Upload Playwright report and traces
+        if: failure() && steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-freighter-nightly
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

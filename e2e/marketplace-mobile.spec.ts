@@ -725,3 +725,82 @@ test.describe("Marketplace - Virtualized Grid Mobile Scroll", () => {
     expect(afterScrollCount).toBeLessThanOrEqual(MOBILE_DOM_BUDGET);
   });
 });
+
+// ─── Mobile Navigation Menu (Issues #1009, #1010) ────────────────────────────
+
+test.describe("Mobile Nav Menu - Focus Trap and Dismiss", () => {
+  const menuButton = (page: import("@playwright/test").Page) =>
+    page.locator('button[aria-controls="mobile-nav-menu"]');
+  const menu = (page: import("@playwright/test").Page) => page.locator("#mobile-nav-menu");
+
+  test.beforeEach(async ({ page }) => {
+    await suppressOverlays(page);
+    await page.goto("/marketplace");
+    await waitForCards(page);
+  });
+
+  test("open menu is a modal dialog linked to its toggle", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+    await expect(menu(page)).toHaveAttribute("role", "dialog");
+    await expect(menu(page)).toHaveAttribute("aria-modal", "true");
+    await expect(menuButton(page)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("Tab cycles within the open menu", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+
+    const focusableCount = await menu(page)
+      .locator("a[href], button:not([disabled])")
+      .count();
+    for (let i = 0; i < focusableCount + 2; i++) {
+      await page.keyboard.press("Tab");
+      const inside = await page.evaluate(() =>
+        document.getElementById("mobile-nav-menu")?.contains(document.activeElement) ?? false,
+      );
+      expect(inside).toBe(true);
+    }
+  });
+
+  test("Escape closes the menu and returns focus to the toggle", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(menu(page)).toHaveCount(0);
+    await expect(menuButton(page)).toBeFocused();
+  });
+
+  test("locks body scroll while open and releases it on close", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+    await page.keyboard.press("Escape");
+    await expect(menu(page)).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  });
+
+  test("tapping the backdrop closes the menu", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+
+    const viewport = page.viewportSize();
+    await page.getByTestId("mobile-nav-overlay").tap({
+      // Below the open menu panel, clear of any fixed bottom controls.
+      position: { x: 10, y: Math.round((viewport?.height ?? 800) * 0.75) },
+    });
+    await expect(menu(page)).toHaveCount(0);
+  });
+
+  test("navigating from the menu closes it on the new route", async ({ page }) => {
+    await menuButton(page).click();
+    await expect(menu(page)).toBeVisible();
+
+    await menu(page).locator('a[href="/transactions"]').click();
+    await page.waitForURL(/\/transactions/);
+    await expect(menu(page)).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  });
+});

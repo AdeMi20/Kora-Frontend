@@ -6,11 +6,12 @@ Project documentation lives here. GitHub-facing files (`CONTRIBUTING.md`, `SECUR
 
 | Document                                  | Description                                                          |
 | ----------------------------------------- | -------------------------------------------------------------------- |
-| [Architecture](./architecture.md)         | Layer breakdown, data flow, wallet/contract/IPFS integration         |
+| [Architecture](./architecture.md)         | Layer breakdown, data flow, wallet/contract/IPFS, Redis migration   |
 | [Design System](./design-system.md)       | Semantic tokens, theming, and UI primitives                          |
 | [Feature Flags](./feature-flags.md)       | All `NEXT_PUBLIC_ENABLE_*` flags, defaults, and local override paths |
 | [Debtor Privacy](./debtor-privacy.md)     | Debtor display rules and privacy constraints                         |
 | [Analytics Events](./analytics-events.md) | Marketplace analytics event schema (no PII)                          |
+| [Testnet Nightly E2E](./testnet-nightly-e2e.md) | Opt-in live-testnet suites, real Freighter extension, CI secrets |
 
 ## Repository docs (root)
 

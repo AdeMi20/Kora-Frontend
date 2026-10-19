@@ -18,6 +18,9 @@ This document describes the technical architecture of the Kora Protocol frontend
 - [Rendering Strategy](#rendering-strategy)
 - [Security Considerations](#security-considerations)
 - [Scalability Notes](#scalability-notes)
+- [Redis Migration for Rate Limiting and Shared State](#redis-migration-for-rate-limiting-and-shared-state)
+- [Deployment & CI](#deployment--ci)
+- [Appendix / Glossary](#appendix--glossary)
 
 ---
 
@@ -547,6 +550,314 @@ Most interactive pages are client-rendered because they require wallet state. In
 - **Pagination:** The service layer already supports `page` and `pageSize` parameters. The marketplace UI can be extended with infinite scroll or pagination controls.
 - **Caching:** TanStack Query's `staleTime` is set to 30s for listings and 60s for individual invoices. Adjust based on on-chain update frequency.
 - **Multi-network:** The network is read from `NEXT_PUBLIC_STELLAR_NETWORK`. Switching to mainnet requires only an environment variable change and redeployment.
+
+### Horizon rate limits (HTTP 429)
+
+Read-only Horizon calls in `lib/stellar/client.ts` (`getAccount`, `getAccountBalances`, `checkAccountExists`, `getAccountTransactions`, `fetchTransactionDetails`) go through `withHorizonRetry`. Hooks such as `useAccountBalance` inherit the policy through these helpers and must not add their own ad-hoc retries.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `maxAttempts` | 4 | Total attempts, including the first call |
+| `baseDelayMs` | 500 ms | Doubles per retry (500 → 1000 → 2000 …) |
+| `maxDelayMs` | 8 s | Cap on the computed backoff |
+| `maxRetryAfterMs` | 30 s | A longer server-requested wait fails immediately instead of blocking the UI |
+
+- **Only 429 is retried.** 404 (`AccountNotFoundError`), other HTTP errors and network failures fail fast.
+- **Jitter:** each delay is half fixed, half random (`computeHorizonBackoffMs`) so many components polling at once do not retry in lockstep.
+- **`Retry-After`:** honoured when present (seconds or HTTP-date), falling back to Horizon's `X-Ratelimit-Reset`; the wait is `max(backoff, Retry-After)`. When neither header is sent, the plain backoff schedule applies.
+- **Shared cooldown:** after a 429 every Horizon read in the tab waits for the same cooldown before its next attempt, so concurrent callers back off together.
+- **Logging:** the degraded state is logged once per 60 s window at `warn` level via `lib/logger`.
+- **Writes are never retried.** Transaction submission goes through Soroban RPC (`submitTransaction`) and is not idempotent; it must not be wrapped in `withHorizonRetry`.
+
+---
+
+## Redis Migration for Rate Limiting and Shared State
+
+This section provides an operational migration guide for replacing single-process in-memory rate limiters and session registries with a shared key-value store (Redis or Valkey) in multi-instance or serverless environments.
+
+### Why Migration is Needed
+
+In the default single-instance development configuration, rate limiters and temporary session registries reside in local process memory using JavaScript `Map` instances:
+- `ipRateLimitMap` and `rateLimitMap` in [`app/api/upload/route.ts`](../app/api/upload/route.ts)
+- `verifiedWallets` in [`lib/verifiedSessions.ts`](../lib/verifiedSessions.ts)
+- `kycByWallet` in [`lib/kycSessions.ts`](../lib/kycSessions.ts)
+
+When scaling horizontally across multiple container replicas, Kubernetes pods, or autoscaling serverless functions (e.g. Vercel, AWS Lambda), in-memory stores introduce severe operational limitations:
+
+1. **Uneven & Multiplied Rate Limits:** Each instance maintains its own isolated counter. If $N$ instances run behind a load balancer, an attacker or abusive client can exceed configured thresholds up to $N \times \text{limit}$ before any individual instance trips its threshold.
+2. **Volatile Session Consistency (Split Brain):** A wallet completing the cryptographic challenge flow (`/api/auth/challenge` $\to$ `/api/auth/verify`) has its verified session recorded only on the instance that handled the request. When a subsequent upload request lands on a different instance, verification fails (`401 Unauthorized: unverified wallet`), disrupting user flows.
+3. **Serverless Ephemeral Memory Loss:** Serverless functions spin down during idle periods. Cold starts wipe process-local state, resetting rate-limiting windows prematurely and dropping unpersisted webhook deliveries.
+
+A shared Redis layer provides atomic counter operations, distributed key expiration (TTL), and centralized session lookup across all application instances.
+
+---
+
+### Current In-Memory State Inventory
+
+The table below documents all process-local in-memory state stores currently implemented in the codebase:
+
+| Store / Component | File | Key Identifier | Window / TTL | Current Threshold | Data Structure | Behavior on Limit / Breach |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Upload IP Limiter** | `app/api/upload/route.ts` | Client IP (`x-forwarded-for` or `127.0.0.1`) | 1 minute (`60,000` ms) | 10 requests / min | `Map<string, number[]>` (sliding log) | HTTP `429 Too Many Requests` with `Retry-After: <sec>` header |
+| **Upload Wallet Limiter** | `app/api/upload/route.ts` | Wallet Address (`walletAddress`, G...) | 1 hour (`3,600,000` ms) | 10 uploads / hr | `Map<string, number[]>` (sliding log) | HTTP `429 Too Many Requests` (`Rate limit exceeded`) |
+| **Verified Sessions** | `lib/verifiedSessions.ts` | Wallet Address (`walletAddress`, G...) | Session lifetime (`expiresAt` ms) | 1 active session per wallet | `Map<string, number>` (address $\to$ exp) | Rejects upload authorization (`401 Unauthorized`) |
+| **KYC Status Registry** | `lib/kycSessions.ts` | Wallet Address (`walletAddress`, G...) | Process lifetime / until updated | Latest KYC record | `Map<string, KycRecord>` | Returns `null` if unverified |
+
+---
+
+### Upload Route Limit Check Lifecycle
+
+During file or metadata uploads (`POST /api/upload`), incoming requests must pass multiple validation gates before reaching Pinata IPFS.
+
+#### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client / Browser
+    participant API as Upload Route (/api/upload)
+    participant Redis as Shared Redis Store
+    participant Pinata as Pinata IPFS Gateway
+
+    Client->>API: POST /api/upload (Multipart form or JSON)
+    Note over API: Step 1: CSRF & Request Sanitization
+    
+    API->>Redis: Check IP Rate Limit (kora:ratelimit:ip:<hashed_ip>)
+    alt IP limit breached (> 10 req / 60s)
+        Redis-->>API: Rejected (retryAfter: <seconds>)
+        API-->>Client: 429 Too Many Requests (Retry-After header)
+    else IP limit allowed
+        Redis-->>API: Allowed
+        Note over API: Step 2: Auth & Token Verification
+        
+        API->>Redis: Query Session (kora:session:verified:<wallet>)
+        alt Wallet unverified or expired
+            Redis-->>API: Key missing or expired
+            API-->>Client: 401 Unauthorized (unverified wallet)
+        else Wallet verified
+            Redis-->>API: Session valid
+            
+            API->>Redis: Check Wallet Rate Limit (kora:ratelimit:wallet:<wallet>)
+            alt Wallet limit breached (> 10 uploads / 1hr)
+                Redis-->>API: Rejected (remaining: 0)
+                API-->>Client: 429 Rate limit exceeded
+            else Wallet limit allowed
+                Redis-->>API: Allowed
+                Note over API: Step 3: Payload Validation, Magic Bytes & Virus Scan
+                
+                API->>Pinata: Forward to Pinata (pinFileToIPFS / pinJSONToIPFS)
+                Pinata-->>API: IPFS Hash (CID)
+                API-->>Client: 200 OK { cid: "Qm..." }
+            end
+        end
+    end
+```
+
+#### Step-by-Step Flow
+
+1. **CSRF & Header Extraction:** Validate CSRF token via `lib/csrf.ts`. Extract client IP from the first address in `x-forwarded-for` (falling back to `127.0.0.1`).
+2. **IP Rate Limit Gate:** Check request count against `kora:ratelimit:ip:<hashed_ip>` in Redis. If the client made $\ge 10$ requests in the last 60 seconds, return `429 Too Many Requests` with a calculated `Retry-After` header.
+3. **Bearer Token & Session Check:** Parse Bearer token from the `Authorization` header. Verify that the token corresponds to an active, verified wallet session via `kora:session:verified:<wallet>` in Redis (mirroring `lib/verifiedSessions.ts`). If missing or expired, return `401 Unauthorized`.
+4. **Wallet Rate Limit Gate:** Extract the target wallet address from the multipart form data or JSON body. Check upload count against `kora:ratelimit:wallet:<wallet>` in Redis. If $\ge 10$ uploads occurred within the past 1 hour, return `429 Rate limit exceeded`.
+5. **Payload Validation & Antivirus:** Enforce maximum file size (10 MB), validate PDF magic bytes (`%PDF-`), and submit to VirusTotal (if `VIRUSTOTAL_API_KEY` is configured).
+6. **IPFS Pinning:** Post file/metadata to Pinata using `PINATA_JWT`. Return the generated IPFS CID (`IpfsHash`) to the caller.
+
+---
+
+### Redis Key Naming Schema and Data Structures
+
+To avoid key collisions and support multi-tenant or multi-environment deployments, all keys follow a strict hierarchical namespace prefix:
+
+$$\text{kora}:\langle\text{domain}\rangle:\langle\text{entity}\rangle:\langle\text{identifier}\rangle$$
+
+| Namespace / Key Pattern | Redis Type | Sample Key | TTL | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `kora:ratelimit:ip:<hashed_ip>` | `ZSET` or `STRING` | `kora:ratelimit:ip:e3b0c44298fc1c14...` | 60 seconds | Sliding-window log or counter of requests per hashed IP address |
+| `kora:ratelimit:wallet:<wallet_address>` | `ZSET` or `STRING` | `kora:ratelimit:wallet:GBBD...` | 3,600 seconds (1 hour) | Sliding-window log or counter of uploads per Stellar wallet address |
+| `kora:session:verified:<wallet_address>` | `STRING` | `kora:session:verified:GBBD...` | Dynamic (match session expiry, e.g. 900s) | Stores session expiry epoch timestamp (`expiresAt` ms) |
+| `kora:session:kyc:<wallet_address>` | `HASH` or `STRING` | `kora:session:kyc:GBBD...` | 86,400s (24h) or persistent | Serialized `KycRecord` (`status`, `sessionId`, `updatedAt`) |
+
+#### Rate Limiting Primitives & Algorithms
+
+Two primary algorithms can be implemented in Redis depending on fidelity requirements:
+
+1. **Sliding Window Log (Sorted Set `ZSET`):**
+   - **Mechanism:** Stores each request timestamp as both member and score (`ZADD key <timestamp> <timestamp>`).
+   - **Pruning & Count:** Atomically prunes expired members with `ZREMRANGEBYSCORE key -inf <now - windowMs>` and evaluates count with `ZCARD key`.
+   - **Advantage:** Exact parity with current in-memory `filter(t => t > now - window)` logic; perfectly smooth sliding window without boundary burst vulnerabilities.
+   - **TTL:** Refreshed on every write with `EXPIRE key <windowSeconds>`.
+
+2. **Sliding Window Counter (String `INCR`):**
+   - **Mechanism:** Approximates sliding window by weighting the counts of the current and previous minute buckets:
+     $$\text{estimatedCount} = \text{count}_{\text{current}} + \text{count}_{\text{previous}} \times \left(1 - \frac{\text{elapsedMs}}{\text{windowMs}}\right)$$
+   - **Advantage:** Extremely low memory consumption (two simple string keys per identifier) and single-roundtrip performance.
+
+---
+
+### Vendor-Agnostic Interface Abstraction
+
+To avoid tight coupling to a single Redis vendor or driver (such as `ioredis`, `@upstash/redis`, or cloud-managed Redis instances), use a pluggable interface abstraction:
+
+```typescript
+// lib/rateLimit/types.ts
+
+export interface RateLimitResult {
+  /** Whether the request is permitted to proceed */
+  allowed: boolean;
+  /** Maximum number of allowed requests in the window */
+  limit: number;
+  /** Remaining request quota in the active window */
+  remaining: number;
+  /** Seconds until quota resets (for Retry-After header) */
+  retryAfter?: number;
+}
+
+export interface RateLimiter {
+  /**
+   * Check rate limit for a given identifier
+   * @param identifier Unique key (e.g. hashed IP or wallet address)
+   * @param limit Maximum permitted operations
+   * @param windowMs Window duration in milliseconds
+   */
+  checkLimit(identifier: string, limit: number, windowMs: number): Promise<RateLimitResult>;
+  
+  /** Reset or clear quota (primarily for tests) */
+  reset?(identifier?: string): Promise<void>;
+}
+```
+
+#### Example Implementation (Redis Sliding Window Log via Atomic Pipeline)
+
+```typescript
+// lib/rateLimit/redisLimiter.ts
+import type { RateLimiter, RateLimitResult } from "./types";
+
+interface RedisClientLike {
+  zremrangebyscore(key: string, min: string | number, max: string | number): Promise<number>;
+  zcard(key: string): Promise<number>;
+  zadd(key: string, score: number, member: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+}
+
+export class RedisSlidingLogLimiter implements RateLimiter {
+  constructor(
+    private readonly redis: RedisClientLike,
+    private readonly prefix: string = "kora:ratelimit:"
+  ) {}
+
+  async checkLimit(identifier: string, limit: number, windowMs: number): Promise<RateLimitResult> {
+    const key = `${this.prefix}${identifier}`;
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    const windowSeconds = Math.ceil(windowMs / 1000);
+
+    // 1. Prune expired entries
+    await this.redis.zremrangebyscore(key, 0, windowStart);
+
+    // 2. Count active hits
+    const currentCount = await this.redis.zcard(key);
+
+    if (currentCount >= limit) {
+      // Exceeded threshold: calculate time remaining for oldest item
+      const retryAfter = windowSeconds;
+      return {
+        allowed: false,
+        limit,
+        remaining: 0,
+        retryAfter,
+      };
+    }
+
+    // 3. Record current hit with unique member (timestamp + random suffix)
+    const member = `${now}-${Math.random().toString(36).slice(2, 7)}`;
+    await this.redis.zadd(key, now, member);
+    await this.redis.expire(key, windowSeconds);
+
+    return {
+      allowed: true,
+      limit,
+      remaining: Math.max(0, limit - (currentCount + 1)),
+    };
+  }
+}
+```
+
+---
+
+### Environment Variables & Configuration
+
+Deployments enabling Redis shared state configure the following environment variables:
+
+| Variable | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `REDIS_URL` | No | `""` (in-memory fallback) | Redis connection URL. Supports standard TCP (`redis://...`), TLS (`rediss://...`), or HTTP endpoints. |
+| `REDIS_TOKEN` | Optional | `""` | Authentication token for HTTP/REST-based Redis providers (e.g. Upstash). |
+| `REDIS_KEY_PREFIX` | No | `kora:` | Namespace prefix prepended to all Redis keys. |
+| `REDIS_TIMEOUT_MS` | No | `200` | Connection and command timeout in milliseconds before triggering fallback. |
+| `RATE_LIMIT_IP_MAX` | No | `10` | Overridable maximum requests per minute per IP for `/api/upload`. |
+| `RATE_LIMIT_WALLET_MAX` | No | `10` | Overridable maximum upload operations per hour per wallet address. |
+
+Example configuration in `.env.local`:
+```bash
+# Redis configuration for multi-instance deployments
+REDIS_URL=redis://default:example_password@redis.internal:6379
+REDIS_KEY_PREFIX=kora:production:
+REDIS_TIMEOUT_MS=200
+```
+
+---
+
+### Operational Considerations & Edge Cases
+
+#### 1. Redis Unavailable Fallback Strategy
+
+Network blips, maintenance restarts, or cloud outages can render Redis temporarily unreachable. The application handles rate limiting and session verification differently:
+
+- **Rate Limiting (Fail-Open with Graceful Degradation):**
+  - Rate limit checks should **fail-open** if Redis fails or times out.
+  - Log a warning with `logger.warn("[rate-limit] Redis unreachable, falling back to process memory / allowing request")`.
+  - Allowing an upload when Redis is down is preferred over an outage that blocks legitimate businesses from securing working capital.
+  - Optional degraded mode: fall back to the existing process-local `ipRateLimitMap` until Redis health probes recover.
+- **Session Verification (Fail-Closed):**
+  - Security-critical token and challenge verification (`lib/verifiedSessions.ts`) MUST **fail-closed**.
+  - If Redis cannot confirm that a wallet completed signature verification, the upload endpoint must reject the request (`401 Unauthorized`) to prevent unverified pinning.
+- **Strict Command Timeouts & Circuit Breaking:**
+  - Redis commands must be bounded by a strict timeout (`REDIS_TIMEOUT_MS=200`).
+  - Do not let a lagging Redis instance block the Node.js event loop or exhaust serverless function execution budgets. If 5 consecutive calls fail or time out, trip a circuit breaker to bypass Redis calls for 30 seconds.
+
+#### 2. Serverless Cold Starts & Connection Handling
+
+When deploying on serverless infrastructure (Vercel Functions, AWS Lambda, Cloudflare Pages):
+
+- **TCP Connection Pool Exhaustion:** Traditional stateful Redis clients (`ioredis`, `node-redis`) establish TCP socket pools. Under sudden traffic spikes, hundreds of concurrent serverless containers can each open socket pools, overwhelming the Redis server's connection limits.
+- **HTTP/REST Redis Recommendation:** For serverless environments, prefer an HTTP/REST-based Redis client (such as `@upstash/redis`). REST requests execute over standard stateless HTTPS requests, avoiding connection pool setup and teardown overhead during cold starts.
+- **Container / Node.js Singleton:** For long-running container deployments (Docker, AWS ECS, Kubernetes), maintain a single cached client instance across the application lifecycle on `globalThis` to preserve connection pooling.
+
+#### 3. GDPR and Privacy Compliance on IP Keys
+
+Under the General Data Protection Regulation (GDPR, Recitals 30 & 49), IP addresses are classified as Personal Identifiable Information (PII). Operators must satisfy privacy requirements when persisting IP data to Redis:
+
+- **IP Pseudonymization & Hashing:**
+  - Never store raw IPv4 or IPv6 addresses directly as plaintext Redis keys.
+  - Hash client IPs with a cryptographically secure salt before constructing keys:
+    $$\text{hashedKey} = \text{SHA-256}(\text{clientIP} + \text{SALT})$$
+  - Using a salt that rotates periodically (e.g. daily) ensures rate limits operate effectively within the 1-minute window while making retroactive IP deanonymization impossible.
+- **Strict, Ephemeral TTLs:**
+  - Every rate limit key MUST have a TTL matching the rate limit window (e.g. 60 seconds).
+  - Redis automatically evicts expired keys, guaranteeing that rate-limiting telemetry is not retained beyond its operational necessity (Data Retention Minimization).
+- **No Request Content in Rate Limit Keys:**
+  - Rate limit keys must only store timestamps or integer counters. Never log file names, CIDs, or metadata into rate limit records.
+
+---
+
+### Migration & Phased Rollout Plan
+
+To migrate zero-downtime from in-memory stores to Redis:
+
+1. **Phase 1 (Abstract Interface):** Introduce the `RateLimiter` interface and wrap current in-memory maps behind the interface.
+2. **Phase 2 (Dual Setup with Feature Flag):** Configure Redis client with fallback to in-memory store when `REDIS_URL` is omitted.
+3. **Phase 3 (Shadow Verification):** In staging, run rate limit checks against Redis while logging discrepancies against in-memory state.
+4. **Phase 4 (Production Cutover):** Supply `REDIS_URL` in production environment secrets. The application automatically transitions to Redis with fail-open safety.
 
 ---
 

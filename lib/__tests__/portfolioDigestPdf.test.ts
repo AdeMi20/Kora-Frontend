@@ -332,5 +332,15 @@ describe("renderDigestPdf — accessibility tagging", () => {
       await renderDigestPdf(makeDoc(), { filename: "kora-digest-2026-08-26" });
       expect(mockPdf.save).toHaveBeenCalledWith("kora-digest-2026-08-26.pdf");
     });
+
+    // Issue #923: additional regression — disclaimer is rendered to the PDF
+    // body so legal text is never silently dropped.
+    it("renders the digest disclaimer via text()", async () => {
+      await renderDigestPdf(makeDoc(), { filename: "test-digest" });
+      const disclaimerCalls = (mockPdf.text.mock.calls as Array<[string, number, number]>).filter(
+        ([t]) => t.includes(DIGEST_DISCLAIMER),
+      );
+      expect(disclaimerCalls.length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

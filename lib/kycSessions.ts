@@ -8,6 +8,7 @@
  * Note: single-instance in-memory store, the same limitation as
  * `lib/verifiedSessions.ts` and the upload rate limiter — a multi-instance
  * deploy needs a shared store (Redis) or a real user record.
+ * See docs/architecture.md#redis-migration-for-rate-limiting-and-shared-state.
  */
 
 import type { KycStatus } from "@/lib/kycWebhook";

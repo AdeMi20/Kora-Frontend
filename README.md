@@ -336,6 +336,10 @@ NEXT_PUBLIC_ENABLE_DEVTOOLS=true
 NEXT_PUBLIC_ENABLE_COMPARISON=true  # Invoice comparison bar (marketplace); share via ?compare=id1,id2
 NEXT_PUBLIC_ENABLE_ONBOARDING_TOUR=false
 NEXT_PUBLIC_ENABLE_BATCH_ACTIONS=false
+
+# Redis / Shared State (Optional for multi-instance deployments — see docs/architecture.md)
+# REDIS_URL=redis://default:password@127.0.0.1:6379
+# REDIS_TOKEN=your_redis_token_for_rest_endpoints
 ```
 
 > **Invoice comparison:** When `NEXT_PUBLIC_ENABLE_COMPARISON=true`, marketplace cards show **Add to Compare**. Select up to **4** invoices, open the comparison table, and share the URL (`?compare=…`) to restore the selection. See `lib/featureFlags.ts` and `lib/comparison.ts`.

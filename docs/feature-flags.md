@@ -74,6 +74,37 @@ whenever `NODE_ENV === "development"` or `NEXT_PUBLIC_ENABLE_DEVTOOLS === "true"
   (`canUseRuntimeOverrides()` gates on `NODE_ENV !== "production"`), so they are
   safe for local iteration only.
 
+#### Restricted overrides on staging hosts (#1025)
+
+Some flags switch the app between live and demo behaviour, which is easy to
+confuse when a staging URL is shared externally. These are listed in
+`DISALLOWED_OVERRIDE_FLAGS` (`lib/featureFlags.ts`) and can only be overridden
+at runtime when `NODE_ENV === "development"`:
+
+| Flag               | Why it is restricted                                      |
+| ------------------ | --------------------------------------------------------- |
+| `mock-data`        | Would silently swap live Soroban data for mock fixtures.  |
+| `secondary-market` | Would expose the P2P trading route on hosts that hide it. |
+
+Outside development (staging, `test`, and any build where the panel is
+enabled via `NEXT_PUBLIC_ENABLE_DEVTOOLS`):
+
+- `setFeatureFlagOverride()` is a no-op for these flags.
+- Stored values for these keys are **ignored on read** — even if
+  `kora:feature-flag-overrides` is edited by hand — and are dropped from
+  storage the next time any override is written.
+- The panel shows the toggle as disabled with a **locked** badge and a
+  tooltip explaining the restriction.
+
+The flags still follow their `NEXT_PUBLIC_ENABLE_*` env var everywhere, so set
+the env var on the deployment (or in Playwright's `webServer.env`) instead of
+relying on a localStorage override. E2E specs should only seed overrides for
+non-restricted flags. Local `npm run dev` is unaffected: every flag remains
+overridable.
+
+`isFlagOverrideAllowed(flag)` reports whether a given flag can be overridden
+in the current build.
+
 ## Where flags are consumed
 
 | Flag                        | Consumers                                                                                                                           |
@@ -84,8 +115,29 @@ whenever `NODE_ENV === "development"` or `NEXT_PUBLIC_ENABLE_DEVTOOLS === "true"
 | `onboarding-tour`           | `components/onboarding/OnboardingTour.tsx`, `app/providers.tsx`                                                                     |
 | `batch-actions`             | `app/dashboard/sme/page.tsx`                                                                                                        |
 | `kyb-mint-gate`             | `app/invoice/create/page.tsx`                                                                                                       |
-| `secondary-market`          | `components/layout/Navbar.tsx`                                                                                                      |
+| `secondary-market`          | `components/layout/Navbar.tsx`, `app/secondary/page.tsx`, `app/secondary/metadata.ts` (server), `app/sitemap.xml/route.ts` (server) |
 | `category-taxonomy-preview` | `components/marketplace/CategoryTaxonomyPreview.tsx`                                                                                |
+
+## Server-side flag reads (SEO)
+
+`lib/featureFlags.ts` imports React hooks, so server layouts and route handlers
+must not import it. Server code reads flags through
+[`lib/serverFeatureFlags.ts`](../lib/serverFeatureFlags.ts), which mirrors the
+`FLAG_ENV_MAP` env var and its `"true"`-only semantics. The runtime override
+panel (localStorage) is **not** visible on the server — SEO output follows the
+deployment env only, so a flag enabled in staging env advertises the route in
+staging only.
+
+### `secondary-market` (#1000, #1002)
+
+| Surface                                             | Flag on                                                                                  | Flag off                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `/secondary` head (`app/secondary/metadata.ts`)     | Title, description, Open Graph + Twitter card, canonical + hreflang, `index, follow`      | Title only, `noindex, nofollow`, no OG/Twitter tags  |
+| `/sitemap.xml` (`app/sitemap.xml/route.ts`)         | Emits `/secondary` with `changefreq: hourly`, `priority: 0.7`                            | `/secondary` omitted (avoids crawls of a disabled route) |
+
+The sitemap evaluates the flag on every request (it is a dynamic route handler
+with a 1h `Cache-Control`), so flipping the env and redeploying/restarting is
+enough — no manual sitemap edits per release.
 
 ## Adding a new flag
 
