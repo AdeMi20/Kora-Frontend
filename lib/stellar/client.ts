@@ -131,9 +131,21 @@ export class HorizonNetworkError extends Error {
   }
 }
 
-// ─── Internal error normaliser ────────────────────────────────────────────────
+// ─── Horizon error normaliser ─────────────────────────────────────────────────
 
-function normaliseHorizonError(err: unknown, address?: string): never {
+/**
+ * Maps any Horizon failure onto one of the typed errors above so hooks can
+ * render stable messages:
+ *
+ * - HTTP 404            → `AccountNotFoundError`
+ * - HTTP 429            → `HorizonRateLimitError`
+ * - other HTTP status   → `HorizonNetworkError("HTTP <status>: …")`
+ * - no response (offline, DNS, CORS, non-Error throws) → `HorizonNetworkError`
+ *
+ * Exported for unit tests (`lib/__tests__/stellar-client-horizon.test.ts`);
+ * app code should rely on the public helpers that call it.
+ */
+export function normaliseHorizonError(err: unknown, address?: string): never {
   if (err instanceof Error) {
     // Horizon SDK wraps HTTP errors — check the response status
     const anyErr = err as { response?: { status?: number } };
@@ -170,6 +182,13 @@ export async function getAccountBalances(address: string): Promise<AccountBalanc
     account = await horizon.loadAccount(address);
   } catch (err) {
     normaliseHorizonError(err, address);
+  }
+
+  // Guard against proxies / misconfigured Horizon URLs returning a 200 with a
+  // body that is not an account record — surface it as a Horizon error rather
+  // than an opaque TypeError from iterating `undefined`.
+  if (!account || !Array.isArray(account.balances)) {
+    throw new HorizonNetworkError("malformed account response");
   }
 
   let xlm = "0";

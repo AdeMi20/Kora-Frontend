@@ -1,21 +1,33 @@
 /**
- * sitemap.xml — Issues #305 / #375
+ * sitemap.xml — Issues #305 / #375 / #1001 / #1002
  *
  * Generates a sitemap with all public pages plus marketplace invoice URLs.
  * Uses mock data (and optional live fetch) without importing `@/lib/env` at
  * module scope so `next build` succeeds in CI with partial env.
+ *
+ * Only publicly browsable content belongs here. Wallet-gated flows
+ * (`/transactions`, `/invoice/create`, `/analytics`, `/dashboard/*`,
+ * `/settings`) are deliberately omitted: they render nothing useful without a
+ * connected wallet, already set `robots: noindex` in their layouts, and are
+ * disallowed in `app/robots.txt/route.ts`.
+ *
+ * `/secondary` is emitted only when the `secondary-market` flag is on at
+ * request time (#1002), so crawlers are not sent to a disabled feature.
  */
 
 import { MOCK_INVOICES } from "@/services/mockData";
+import { isSecondaryMarketEnabledOnServer } from "@/lib/serverFeatureFlags";
 import type { Invoice } from "@/types";
 
+// Wallet-gated routes must never be listed here — `__tests__/sitemap.test.ts`
+// asserts they are absent from the generated XML.
 const STATIC_PAGES = [
   { path: "/", changefreq: "daily", priority: "1.0" },
   { path: "/marketplace", changefreq: "hourly", priority: "0.9" },
-  { path: "/analytics", changefreq: "daily", priority: "0.6" },
-  { path: "/transactions", changefreq: "daily", priority: "0.5" },
-  { path: "/invoice/create", changefreq: "weekly", priority: "0.7" },
 ];
+
+/** Secondary market listing page — gated by the `secondary-market` flag. */
+const SECONDARY_PAGE = { path: "/secondary", changefreq: "hourly", priority: "0.7" };
 
 const PUBLIC_STATUSES = new Set([
   "listed",
@@ -80,7 +92,11 @@ export async function GET() {
     process.env.NEXT_PUBLIC_APP_URL || "https://kora.finance";
   const now = new Date().toISOString().split("T")[0];
 
-  const staticEntries = STATIC_PAGES.map((page) =>
+  const pages = isSecondaryMarketEnabledOnServer()
+    ? [...STATIC_PAGES, SECONDARY_PAGE]
+    : STATIC_PAGES;
+
+  const staticEntries = pages.map((page) =>
     urlEntry(baseUrl, page.path, now, page.changefreq, page.priority)
   );
 
