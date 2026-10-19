@@ -1528,24 +1528,11 @@
       }
     }
   },
-  "metadata": {
-    "investorDashboard": {
-      "title": "Painel do investidor",
-      "description": "Acompanhe sua carteira de financiamento de faturas. Monitore posições ativas, rendimento esperado e cronogramas de pagamento de todos os seus investimentos no Kora Protocol.",
-      "ogDescription": "Acompanhe sua carteira de financiamento de faturas — posições ativas, rendimento e cronogramas de pagamento.",
-      "ogImageAlt": "Painel do investidor do Kora Protocol"
-    },
-    "smeDashboard": {
-      "title": "Painel da PME",
-      "description": "Gerencie suas faturas tokenizadas. Acompanhe o progresso do financiamento, monitore cronogramas de pagamento e acesse liquidez instantânea em USDC para o seu negócio.",
-      "ogDescription": "Gerencie suas faturas tokenizadas e acompanhe o progresso do financiamento no Kora Protocol.",
-      "ogImageAlt": "Painel da PME do Kora Protocol"
-    },
-    "settings": {
-      "title": "Configurações",
-      "description": "Gerencie suas preferências de notificação, perfil e configurações do tour do produto no Kora Protocol.",
-      "ogDescription": "Gerencie preferências de notificação e o tour do produto no Kora Protocol.",
-      "ogImageAlt": "Configurações do Kora Protocol"
+  "ui": {
+    "select": {
+      "loading": "Carregando opções…",
+      "optionsLoaded": "{count, plural, =0 {Nenhuma opção disponível} one {# opção disponível} other {# opções disponíveis}}",
+      "loadError": "Não foi possível carregar as opções"
     }
   }
 }

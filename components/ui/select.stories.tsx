@@ -114,3 +114,12 @@ export const GroupedOptions: Story = {
     options: CATEGORY_GROUPS,
   },
 };
+
+export const Loading: Story = {
+  args: {
+    label: 'Jurisdiction',
+    placeholder: 'Loading jurisdictions...',
+    options: [],
+    loading: true,
+  },
+};
