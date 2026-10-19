@@ -816,7 +816,10 @@
     "error": "Error",
     "rpcDown": "RPC caído",
     "rpcDegraded": "RPC degradado",
-    "statusAriaLabel": "Estado de la red: {status} en {network}"
+    "statusAriaLabel": "Estado de la red: {status} en {network}",
+    "horizonDegradedToast": "Horizon responde con lentitud",
+    "horizonDownToast": "Horizon no está disponible",
+    "horizonToastHint": "Los saldos y el historial de transacciones pueden estar desactualizados. Inténtalo de nuevo en unos minutos."
   },
   "offline": {
     "title": "Estás sin conexión",

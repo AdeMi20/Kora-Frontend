@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { Globe, Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ export function LanguageSwitcher() {
   const t = useTranslations("language");
   const locale = useLocale();
   const setLocale = useSetLocale();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -37,8 +39,14 @@ export function LanguageSwitcher() {
   }, [open]);
 
   const handleSelect = (next: Locale) => {
-    setLocale(next);
     setOpen(false);
+    // Re-selecting the active locale is a no-op — no cookie write, no refetch.
+    if (next === locale) return;
+    // setLocale persists the kora-locale cookie; refreshing re-runs server
+    // components so middleware-resolved `lang`/`dir` and the manifest pick up
+    // the new locale without a full reload.
+    setLocale(next);
+    router.refresh();
   };
 
   return (

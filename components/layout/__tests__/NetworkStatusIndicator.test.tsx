@@ -21,7 +21,10 @@ vi.mock("@/hooks/useNetworkStatus", () => ({
   }),
 }));
 
-// IndexedDB-backed queue helpers are mocked so tests never touch real IndexedDB.
+vi.mock("@/hooks/useToast", () => ({
+  useToast: () => ({ error: vi.fn(), dismiss: vi.fn() }),
+}));
+
 vi.mock("@/lib/xdrDraftQueue", () => ({
   listQueuedXdrDrafts: vi.fn(),
   flushQueuedXdrDrafts: vi.fn(),

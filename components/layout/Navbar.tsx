@@ -19,7 +19,7 @@ import {
   Sparkles,
   Settings,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 
@@ -42,8 +42,25 @@ import { useWalletStore } from "@/store/walletStore";
 import { ShortcutBadge } from "@/components/ui/ShortcutBadge";
 import { cn } from "@/lib/utils";
 import { useFeatureFlag } from "@/lib/featureFlags";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 const MENU_ID = "mobile-nav-menu";
+
+// useLayoutEffect warns during SSR; fall back to useEffect on the server.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * Portaled surfaces that live outside the header DOM but must not count as an
+ * "outside" click for the mobile menu — the wallet modal (Radix Dialog, opened
+ * from the menu's own WalletButton), any other dialog, and toasts.
+ */
+const OUTSIDE_CLICK_IGNORE_SELECTOR = [
+  '[role="dialog"]',
+  '[role="alertdialog"]',
+  "[data-radix-popper-content-wrapper]",
+  "[data-sonner-toaster]",
+].join(", ");
 
 /**
  * Changelog entry point with an unread dot (Issue #679).
@@ -93,7 +110,10 @@ export function Navbar() {
   const toggleTheme = useUIStore((s) => s.toggleTheme);
   const shortcutsEnabled = useUIStore((s) => s.shortcutsEnabled);
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen);
+  const walletModalOpen = useUIStore((s) => s.walletModalOpen);
+  const commandPaletteOpen = useUIStore((s) => s.commandPaletteOpen);
   const navRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [addressBookOpen, setAddressBookOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -118,34 +138,72 @@ export function Navbar() {
     { href: "/settings", label: tSettings("navLabel"), icon: Settings, shortcut: null },
   ];
 
-  // Close on route change
-  useEffect(() => {
+  /**
+   * Close the mobile menu. Keyboard dismissals (Escape, toggle) hand focus back
+   * to the hamburger button; navigation-driven closes leave focus alone so the
+   * router's own focus management for the new page wins.
+   */
+  const closeMobileMenu = useCallback((returnFocus = false) => {
+    setMobileOpen(false);
+    if (returnFocus) menuButtonRef.current?.focus();
+  }, []);
+
+  // Trap focus inside the open mobile menu (Issue #1009). The trap is paused
+  // while a nested modal (wallet connect, command palette) is open so the two
+  // traps never fight over Tab/Escape. Focus restoration is handled by
+  // closeMobileMenu rather than the hook so a route change does not yank focus
+  // back to the header.
+  const mobileMenuRef = useFocusTrap<HTMLDivElement>(
+    mobileOpen && !walletModalOpen && !commandPaletteOpen,
+    { onEscape: () => closeMobileMenu(true), restoreFocus: false },
+  );
+
+  // Close on route change — before paint, so the stale menu never flashes over
+  // the new page and focus is not left inside a menu that is about to unmount.
+  const previousPathname = useRef(pathname);
+  useIsomorphicLayoutEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
     setMobileOpen(false);
   }, [pathname]);
 
-  // Close on outside click
+  // Close on outside click/tap. `touchstart` covers iOS, where tapping a
+  // non-interactive area does not dispatch a compatibility `mousedown`.
   useEffect(() => {
     if (!mobileOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setMobileOpen(false);
+    function handlePointer(e: Event) {
+      const target = e.target as Node | null;
+      if (!target || !navRef.current) return;
+      if (navRef.current.contains(target)) return;
+      // Clicks inside portaled modals (e.g. the wallet modal opened from the
+      // menu) are not "outside" the menu.
+      if (useUIStore.getState().walletModalOpen) return;
+      if (target instanceof Element && target.closest(OUTSIDE_CLICK_IGNORE_SELECTOR)) {
+        return;
       }
+      setMobileOpen(false);
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("touchstart", handlePointer, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("touchstart", handlePointer);
+    };
   }, [mobileOpen]);
 
-  // Close on Escape key
+  // Lock body scroll while the mobile menu is open; restore the previous value
+  // on close or unmount.
   useEffect(() => {
     if (!mobileOpen) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMobileOpen(false);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [mobileOpen]);
 
   return (
+    <>
     <header
       ref={navRef}
       className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl"
@@ -301,9 +359,10 @@ export function Navbar() {
 
           {/* Hamburger — mobile only */}
           <button
+            ref={menuButtonRef}
             type="button"
             className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
-            onClick={() => setMobileOpen((v) => !v)}
+            onClick={() => (mobileOpen ? closeMobileMenu(true) : setMobileOpen(true))}
             aria-label={mobileOpen ? t("closeMenu") : t("openMenu")}
             aria-expanded={mobileOpen}
             aria-controls={MENU_ID}
@@ -321,22 +380,27 @@ export function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
+            ref={mobileMenuRef}
             id={MENU_ID}
-            role="navigation"
-            aria-label="Mobile navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile menu"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden border-t border-border bg-background md:hidden"
           >
-            <div className="px-4 pb-4 pt-2 space-y-1">
+            <nav className="px-4 pb-4 pt-2 space-y-1" aria-label="Mobile navigation">
               {NAV_LINKS.map(({ href, label, icon: Icon }) => {
                 const active = pathname.startsWith(href);
                 return (
                   <Link
                     key={href}
                     href={href}
+                    // Query-only and same-path navigations do not change
+                    // pathname, so close explicitly on activation as well.
+                    onClick={() => closeMobileMenu()}
                     aria-current={active ? "page" : undefined}
                     data-tour={
                       href === "/marketplace"
@@ -367,7 +431,7 @@ export function Navbar() {
               <div className="pt-2 border-t border-border space-y-2" data-tour="wallet-button">
                 <WalletButton />
               </div>
-            </div>
+            </nav>
           </motion.div>
         )}
       </AnimatePresence>
@@ -377,5 +441,19 @@ export function Navbar() {
       )}
       <TransactionHistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} />
     </header>
+
+    {/* Backdrop for the mobile menu — sits below the sticky header (z-40) and
+        dismisses the menu on tap. Rendered outside <header> because its
+        backdrop-filter would otherwise become the containing block for
+        `position: fixed`. */}
+    {mobileOpen && (
+      <div
+        aria-hidden="true"
+        data-testid="mobile-nav-overlay"
+        className="fixed inset-0 z-30 bg-background/60 md:hidden"
+        onClick={() => closeMobileMenu()}
+      />
+    )}
+    </>
   );
 }

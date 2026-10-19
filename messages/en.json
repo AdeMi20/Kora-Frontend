@@ -816,7 +816,10 @@
     "error": "Error",
     "rpcDown": "RPC Down",
     "rpcDegraded": "RPC Degraded",
-    "statusAriaLabel": "Network status: {status} on {network}"
+    "statusAriaLabel": "Network status: {status} on {network}",
+    "horizonDegradedToast": "Horizon is responding slowly",
+    "horizonDownToast": "Horizon is unavailable",
+    "horizonToastHint": "Balances and transaction history may be out of date. Please try again in a few minutes."
   },
   "offline": {
     "title": "You're offline",
