@@ -1524,5 +1524,12 @@
         "narrow": "Kora Protocol no celular"
       }
     }
+  },
+  "ui": {
+    "select": {
+      "loading": "Carregando opções…",
+      "optionsLoaded": "{count, plural, =0 {Nenhuma opção disponível} one {# opção disponível} other {# opções disponíveis}}",
+      "loadError": "Não foi possível carregar as opções"
+    }
   }
 }

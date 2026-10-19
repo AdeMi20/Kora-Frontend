@@ -354,6 +354,7 @@ function SecondaryMarketplaceContent() {
                   value={tenorFilter}
                   onChange={(val) => setTenorFilter(sanitizeQueryParam(val))}
                   options={TENOR_OPTIONS}
+                  loading={myPositionsQuery.isLoading}
                   className="w-40 bg-zinc-950/80 border-zinc-800 text-xs"
                   aria-label={t("tenorAria")}
                 />
@@ -366,6 +367,7 @@ function SecondaryMarketplaceContent() {
                   value={yieldFilter}
                   onChange={(val) => setYieldFilter(sanitizeQueryParam(val))}
                   options={YIELD_OPTIONS}
+                  loading={myPositionsQuery.isLoading}
                   className="w-36 bg-zinc-950/80 border-zinc-800 text-xs"
                   aria-label={t("yieldAria")}
                 />
@@ -389,6 +391,7 @@ function SecondaryMarketplaceContent() {
                   value={sortBy}
                   onChange={(value) => setSortBy(parseSecondarySort(value))}
                   options={[...SECONDARY_SORT_OPTIONS]}
+                  loading={myPositionsQuery.isLoading}
                   className="w-52 border-zinc-800 bg-zinc-950/80 text-xs"
                   aria-label="Sort secondary market listings"
                 />
@@ -648,6 +651,7 @@ function SecondaryMarketplaceContent() {
                   value={tenorFilter}
                   onChange={(val) => setTenorFilter(sanitizeQueryParam(val))}
                   options={TENOR_OPTIONS}
+                  loading={myPositionsQuery.isLoading}
                   className="w-full border-zinc-800 bg-zinc-900 text-xs"
                 />
               </div>
@@ -658,6 +662,7 @@ function SecondaryMarketplaceContent() {
                   value={yieldFilter}
                   onChange={(val) => setYieldFilter(sanitizeQueryParam(val))}
                   options={YIELD_OPTIONS}
+                  loading={myPositionsQuery.isLoading}
                   className="w-full border-zinc-800 bg-zinc-900 text-xs"
                 />
               </div>

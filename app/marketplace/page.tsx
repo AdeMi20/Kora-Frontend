@@ -564,6 +564,7 @@ function MarketplaceContent() {
         placeholder={t("allCategories")}
         isMulti={true}
         isSearchable={true}
+        loading={isLoading}
       />
 
       {/* Jurisdiction Multi-select */}
@@ -575,6 +576,7 @@ function MarketplaceContent() {
         placeholder={t("allJurisdictions")}
         isMulti={true}
         isSearchable={true}
+        loading={isLoading}
       />
 
       {/* Risk Tiers Checkbox Group */}

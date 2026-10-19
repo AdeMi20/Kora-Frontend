@@ -1524,5 +1524,12 @@
         "narrow": "Kora Protocol on Mobile"
       }
     }
+  },
+  "ui": {
+    "select": {
+      "loading": "Loading options…",
+      "optionsLoaded": "{count, plural, =0 {No options available} one {# option available} other {# options available}}",
+      "loadError": "Could not load options"
+    }
   }
 }
