@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, FlaskConical, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, FlaskConical, Lock, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   FEATURE_FLAGS,
   getFeatureFlagOverride,
+  isFlagOverrideAllowed,
   resetFeatureFlagOverrides,
   setFeatureFlagOverride,
   useFeatureFlags,
@@ -25,6 +26,10 @@ const FLAG_DESCRIPTIONS: Record<FeatureFlag, string> = {
   "category-taxonomy-preview": "Preview enhanced category taxonomy filters.",
 };
 
+const RESTRICTED_OVERRIDE_TOOLTIP =
+  "Runtime overrides for this flag are disabled outside local development " +
+  "to avoid live/demo mode confusion on shared hosts. Set its NEXT_PUBLIC_ENABLE_* env var instead.";
+
 export function FeatureFlagPanel() {
   const panelEnabled =
     process.env.NODE_ENV === "development" ||
@@ -41,6 +46,7 @@ function FeatureFlagPanelInner() {
   const [collapsed, setCollapsed] = useState(false);
 
   const handleOverrideChange = (flag: FeatureFlag, enabled: boolean) => {
+    if (!isFlagOverrideAllowed(flag)) return;
     setFeatureFlagOverride(flag, enabled);
 
     if (flag === "mock-data") {
@@ -108,11 +114,17 @@ function FeatureFlagPanelInner() {
           {FEATURE_FLAGS.map((flag) => {
             const override = getFeatureFlagOverride(flag);
             const source = override === undefined ? "env" : "override";
+            const restricted = !isFlagOverrideAllowed(flag);
+            const restrictionId = `feature-flag-${flag}-restriction`;
 
             return (
               <label
                 key={flag}
-                className="flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-3 transition-colors hover:border-zinc-700"
+                title={restricted ? RESTRICTED_OVERRIDE_TOOLTIP : undefined}
+                className={cn(
+                  "flex items-start justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-3 transition-colors",
+                  restricted ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-zinc-700",
+                )}
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
@@ -127,19 +139,35 @@ function FeatureFlagPanelInner() {
                     >
                       {source}
                     </span>
+                    {restricted && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300"
+                        title={RESTRICTED_OVERRIDE_TOOLTIP}
+                      >
+                        <Lock className="h-3 w-3" aria-hidden="true" />
+                        locked
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs leading-5 text-zinc-400">
                     {FLAG_DESCRIPTIONS[flag]}
                   </p>
+                  {restricted && (
+                    <p id={restrictionId} className="text-[11px] leading-4 text-amber-300/80">
+                      {RESTRICTED_OVERRIDE_TOOLTIP}
+                    </p>
+                  )}
                 </div>
 
                 <input
                   type="checkbox"
                   checked={flags[flag]}
+                  disabled={restricted}
+                  aria-describedby={restricted ? restrictionId : undefined}
                   onChange={(event) =>
                     handleOverrideChange(flag, event.currentTarget.checked)
                   }
-                  className="mt-1 h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-400"
+                  className="mt-1 h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-400 disabled:cursor-not-allowed"
                   aria-label={`Toggle ${flag}`}
                 />
               </label>

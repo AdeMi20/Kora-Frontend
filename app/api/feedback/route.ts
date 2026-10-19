@@ -1,18 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { verifyCsrf } from "@/lib/csrf";
+import { sanitizeInput } from "@/lib/security";
 
 export interface FeedbackPayload {
   type: "bug" | "feature" | "other";
   title: string;
   description: string;
   screenshot?: string | null; // base64 data URL
-  context: {
+  context?: {
     url: string;
     walletAddress?: string | null;
     userAgent: string;
     timestamp: string;
   };
+}
+
+// Limits mirror the FeedbackWidget client schema (components/feedback/FeedbackWidget.tsx).
+const FEEDBACK_TYPES: FeedbackPayload["type"][] = ["bug", "feature", "other"];
+const MAX_TITLE_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_CONTEXT_FIELD_LENGTH = 2048;
+
+const ALLOWED_KEYS = new Set(["type", "title", "description", "screenshot", "context"]);
+const CONTEXT_KEYS = new Set(["url", "walletAddress", "userAgent", "timestamp"]);
+
+/**
+ * Like sanitizeInput, but keeps line breaks and tabs so multi-line
+ * descriptions survive. Emoji and other non-ASCII text are preserved.
+ */
+function sanitizeMultiline(value: string, maxLength: number): string {
+  return value
+    .replace(/<[^>]*>/g, "") // strip HTML tags
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "") // control chars except \t \n \r
+    .slice(0, maxLength)
+    .trim();
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reject JSON shapes the FeedbackWidget never sends: non-object bodies,
+ * unknown keys, and non-string field values. Returns an error message or null.
+ */
+function validateFeedbackShape(raw: unknown): string | null {
+  if (!isPlainObject(raw)) return "Request body must be a JSON object";
+
+  for (const key of Object.keys(raw)) {
+    if (!ALLOWED_KEYS.has(key)) return `Unexpected field: ${key}`;
+  }
+
+  for (const key of ["type", "title", "description"] as const) {
+    if (raw[key] !== undefined && typeof raw[key] !== "string") {
+      return `${key} must be a string`;
+    }
+  }
+
+  if (raw.screenshot !== undefined && raw.screenshot !== null && typeof raw.screenshot !== "string") {
+    return "screenshot must be a string or null";
+  }
+
+  if (raw.context !== undefined) {
+    if (!isPlainObject(raw.context)) return "context must be an object";
+    for (const [key, value] of Object.entries(raw.context)) {
+      if (!CONTEXT_KEYS.has(key)) return `Unexpected context field: ${key}`;
+      if (key === "walletAddress" && value === null) continue;
+      if (typeof value !== "string") return `context.${key} must be a string`;
+      if (value.length > MAX_CONTEXT_FIELD_LENGTH) return `context.${key} is too long`;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -28,20 +89,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (csrfError) return csrfError;
 
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+
+  let raw: unknown;
   try {
-    const body = (await req.json()) as FeedbackPayload;
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body", requestId }, { status: 400 });
+  }
+
+  try {
+    const shapeError = validateFeedbackShape(raw);
+    if (shapeError) {
+      return NextResponse.json({ error: shapeError, requestId }, { status: 400 });
+    }
+    const input = raw as FeedbackPayload;
 
     // ── Basic validation ──────────────────────────────────────────────────────
-    if (!body.type || !body.title?.trim() || !body.description?.trim()) {
+    if (!input.type || !input.title?.trim() || !input.description?.trim()) {
       return NextResponse.json(
         { error: "type, title, and description are required", requestId },
         { status: 400 }
       );
     }
 
-    const allowed = ["bug", "feature", "other"];
-    if (!allowed.includes(body.type)) {
+    if (!FEEDBACK_TYPES.includes(input.type)) {
       return NextResponse.json({ error: "Invalid feedback type", requestId }, { status: 400 });
+    }
+
+    if (input.title.length > MAX_TITLE_LENGTH) {
+      return NextResponse.json(
+        { error: `title must be at most ${MAX_TITLE_LENGTH} characters`, requestId },
+        { status: 400 }
+      );
+    }
+
+    if (input.description.length > MAX_DESCRIPTION_LENGTH) {
+      return NextResponse.json(
+        { error: `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`, requestId },
+        { status: 400 }
+      );
+    }
+
+    // ── Sanitization: strip HTML tags and control characters ────────────────
+    const body: FeedbackPayload = {
+      ...input,
+      title: sanitizeInput(input.title, MAX_TITLE_LENGTH),
+      description: sanitizeMultiline(input.description, MAX_DESCRIPTION_LENGTH),
+    };
+    if (!body.title || !body.description) {
+      return NextResponse.json(
+        { error: "type, title, and description are required", requestId },
+        { status: 400 }
+      );
     }
 
     // ── Screenshot validation (Issue #959) ────────────────────────────────
@@ -90,10 +189,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const issueBody = [
         `**Type:** ${body.type}`,
-        `**URL:** ${body.context.url}`,
-        `**Wallet:** ${body.context.walletAddress ?? "not connected"}`,
-        `**Browser:** ${body.context.userAgent}`,
-        `**Submitted:** ${body.context.timestamp}`,
+        `**URL:** ${body.context?.url ?? "unknown"}`,
+        `**Wallet:** ${body.context?.walletAddress ?? "not connected"}`,
+        `**Browser:** ${body.context?.userAgent ?? "unknown"}`,
+        `**Submitted:** ${body.context?.timestamp ?? "unknown"}`,
         "",
         "## Description",
         body.description,
