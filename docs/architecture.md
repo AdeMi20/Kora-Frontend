@@ -551,6 +551,24 @@ Most interactive pages are client-rendered because they require wallet state. In
 - **Caching:** TanStack Query's `staleTime` is set to 30s for listings and 60s for individual invoices. Adjust based on on-chain update frequency.
 - **Multi-network:** The network is read from `NEXT_PUBLIC_STELLAR_NETWORK`. Switching to mainnet requires only an environment variable change and redeployment.
 
+### Horizon rate limits (HTTP 429)
+
+Read-only Horizon calls in `lib/stellar/client.ts` (`getAccount`, `getAccountBalances`, `checkAccountExists`, `getAccountTransactions`, `fetchTransactionDetails`) go through `withHorizonRetry`. Hooks such as `useAccountBalance` inherit the policy through these helpers and must not add their own ad-hoc retries.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `maxAttempts` | 4 | Total attempts, including the first call |
+| `baseDelayMs` | 500 ms | Doubles per retry (500 → 1000 → 2000 …) |
+| `maxDelayMs` | 8 s | Cap on the computed backoff |
+| `maxRetryAfterMs` | 30 s | A longer server-requested wait fails immediately instead of blocking the UI |
+
+- **Only 429 is retried.** 404 (`AccountNotFoundError`), other HTTP errors and network failures fail fast.
+- **Jitter:** each delay is half fixed, half random (`computeHorizonBackoffMs`) so many components polling at once do not retry in lockstep.
+- **`Retry-After`:** honoured when present (seconds or HTTP-date), falling back to Horizon's `X-Ratelimit-Reset`; the wait is `max(backoff, Retry-After)`. When neither header is sent, the plain backoff schedule applies.
+- **Shared cooldown:** after a 429 every Horizon read in the tab waits for the same cooldown before its next attempt, so concurrent callers back off together.
+- **Logging:** the degraded state is logged once per 60 s window at `warn` level via `lib/logger`.
+- **Writes are never retried.** Transaction submission goes through Soroban RPC (`submitTransaction`) and is not idempotent; it must not be wrapped in `withHorizonRetry`.
+
 ---
 
 ## Redis Migration for Rate Limiting and Shared State

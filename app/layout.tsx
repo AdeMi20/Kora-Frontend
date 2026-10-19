@@ -15,6 +15,7 @@ import { WebVitalsReporter } from "@/components/dev/WebVitalsReporter";
 import { WebVitalsPanel as WebVitalsPanelClient } from "@/components/dev/WebVitalsPanel";
 import { defaultLocale, locales, type Locale } from "@/i18n/config";
 import { THEME_INIT_SCRIPT, buildViewportThemeColor } from "@/lib/theme";
+import { localeToOgLocale } from "@/lib/localizedMetadata";
 
 const WebVitalsPanel =
   process.env.NODE_ENV === "development"
@@ -48,19 +49,6 @@ function generateHreflangAlternates(pathname: string = "/") {
   }
   
   return alternates;
-}
-
-/**
- * Map locale code to OpenGraph locale format.
- */
-function localeToOgLocale(locale: Locale): string {
-  const localeMap: Record<Locale, string> = {
-    en: "en_US",
-    es: "es_ES",
-    ar: "ar_SA",
-    "pt-BR": "pt_BR",
-  };
-  return localeMap[locale] || "en_US";
 }
 
 /**
